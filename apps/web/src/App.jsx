@@ -25,7 +25,7 @@ const CHANNELS = [
 ];
 
 function Login({ onLogin }) {
-  const [f, setF] = useState({ tenant: "crown", emp_id: "", password: "" });
+  const [f, setF] = useState({ tenant: "crown", emp_id: "1001", password: "admin123" });
   const [err, setErr] = useState("");
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const go = async () => {
@@ -38,8 +38,8 @@ function Login({ onLogin }) {
   return (
     <div className="login card">
       <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
-        <h1 style={{ color: "var(--blue-primary)", margin: 0 }}>EasyPOS</h1>
-        <p style={{ color: "var(--gray)", fontSize: "0.9rem", margin: "0.3rem 0 0" }}>Enterprise Cloud Point of Sale</p>
+        <h1 style={{ color: "var(--blue-primary)", margin: 0, fontSize: "1.75rem", letterSpacing: "-0.03em" }}>crownpointofsale</h1>
+        <p style={{ color: "var(--gray)", fontSize: "0.88rem", margin: "0.3rem 0 0" }}>Enterprise Cloud Point of Sale</p>
       </div>
       <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray)" }}>Business Code</label>
       <input placeholder="crown" value={f.tenant} onChange={set("tenant")} />
@@ -55,9 +55,9 @@ function Login({ onLogin }) {
         onChange={set("password")}
         onKeyDown={(e) => e.key === "Enter" && go()}
       />
-      {err && <div style={{ color: "var(--red)", fontWeight: 600 }}>{err}</div>}
-      <button className="primary" style={{ marginTop: "0.5rem" }} onClick={go}>Sign In to Terminal</button>
-      <div style={{ background: "var(--blue-light)", padding: "0.6rem", borderRadius: "6px", fontSize: "0.78rem", color: "var(--blue-primary)" }}>
+      {err && <div style={{ color: "var(--red)", fontWeight: 600, fontSize: "0.9rem" }}>{err}</div>}
+      <button className="primary" style={{ marginTop: "0.5rem", minHeight: "46px" }} onClick={go}>Sign In to Terminal</button>
+      <div style={{ background: "var(--blue-light)", padding: "0.6rem 0.8rem", borderRadius: "8px", fontSize: "0.78rem", color: "var(--blue-primary)", marginTop: "0.5rem" }}>
         Demo Accounts: <b>1001</b> (Owner), <b>1002</b> (Manager), <b>1003</b> (Cashier) | Password: <b>admin123</b>
       </div>
     </div>
@@ -733,8 +733,8 @@ export default function App() {
     <>
       <header>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <span className="brand-badge">⚡ {me.tenant}</span>
-          <span style={{ fontSize: "0.85rem", color: "var(--gray)" }}>({me.branch || "Uttara"})</span>
+          <span className="brand-badge">👑 crownpointofsale</span>
+          <span style={{ fontSize: "0.85rem", color: "var(--gray)", fontWeight: 500 }}>({me.branch || "Uttara"})</span>
           <span className={`status-badge ${isOnline ? "online" : "offline"}`}>
             {isOnline ? "● Online" : "○ Offline"}
           </span>
