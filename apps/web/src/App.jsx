@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { getOutbox, queueOutbox, flushOutbox } from "./outbox";
 
 const api = async (path, token, body, method) => {
@@ -37,20 +37,29 @@ function Login({ onLogin }) {
   };
   return (
     <div className="login card">
-      <h1>EasyPOS</h1>
-      <p style={{ color: "var(--gray)", margin: "0 0 .5rem 0" }}>Restaurant POS & Inventory System</p>
-      <input placeholder="Business code (e.g. crown)" value={f.tenant} onChange={set("tenant")} />
-      <input placeholder="Employee ID (e.g. 1001)" value={f.emp_id} onChange={set("emp_id")} />
+      <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
+        <h1 style={{ color: "var(--blue-primary)", margin: 0 }}>EasyPOS</h1>
+        <p style={{ color: "var(--gray)", fontSize: "0.9rem", margin: "0.3rem 0 0" }}>Enterprise Cloud Point of Sale</p>
+      </div>
+      <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray)" }}>Business Code</label>
+      <input placeholder="crown" value={f.tenant} onChange={set("tenant")} />
+      
+      <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray)" }}>Employee ID</label>
+      <input placeholder="1001" value={f.emp_id} onChange={set("emp_id")} />
+      
+      <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray)" }}>Password</label>
       <input
         type="password"
-        placeholder="Password"
+        placeholder="••••••••"
         value={f.password}
         onChange={set("password")}
         onKeyDown={(e) => e.key === "Enter" && go()}
       />
-      {err && <div className="err">{err}</div>}
-      <button className="primary" onClick={go}>Log in</button>
-      <small style={{ color: "var(--gray)" }}>Default demo accounts: 1001 (Owner), 1002 (Manager), 1003 (Cashier). Pass: admin123</small>
+      {err && <div style={{ color: "var(--red)", fontWeight: 600 }}>{err}</div>}
+      <button className="primary" style={{ marginTop: "0.5rem" }} onClick={go}>Sign In to Terminal</button>
+      <div style={{ background: "var(--blue-light)", padding: "0.6rem", borderRadius: "6px", fontSize: "0.78rem", color: "var(--blue-primary)" }}>
+        Demo Accounts: <b>1001</b> (Owner), <b>1002</b> (Manager), <b>1003</b> (Cashier) | Password: <b>admin123</b>
+      </div>
     </div>
   );
 }
@@ -60,10 +69,26 @@ function Pay({ order, token, onDone, isOffline }) {
   const [amt, setAmt] = useState((order.total / 100).toFixed(2));
   const [err, setErr] = useState("");
 
+  const numpadPress = (val) => {
+    if (val === "C") setAmt("");
+    else if (val === "DEL") setAmt(prev => prev.slice(0, -1));
+    else if (val === "EXACT") setAmt((order.total / 100).toFixed(2));
+    else setAmt(prev => prev + val);
+  };
+
+  const printBill = async () => {
+    try {
+      await api(`/orders/${order.id}/print-bill`, token, {});
+      alert("Pre-payment Customer Bill sent to printer queue!");
+    } catch (e) {
+      alert("Could not print bill: " + e.message);
+    }
+  };
+
   const go = async () => {
-    const amountPaisa = Math.round(parseFloat(amt) * 100);
+    const amountPaisa = Math.round(parseFloat(amt || "0") * 100);
     if (amountPaisa < order.total) {
-      setErr("Amount is less than total bill");
+      setErr("Tendered amount is less than total bill");
       return;
     }
     const payUuid = crypto.randomUUID();
@@ -84,7 +109,7 @@ function Pay({ order, token, onDone, isOffline }) {
         amount: amountPaisa,
         client_uuid: payUuid
       });
-      alert(r.change > 0 ? "Change due: " + tk(r.change) : "Payment successful");
+      alert(r.change > 0 ? "Change Due: " + tk(r.change) : "Payment Recorded Successfully");
       onDone();
     } catch (e) {
       setErr(e.message);
@@ -92,36 +117,92 @@ function Pay({ order, token, onDone, isOffline }) {
   };
 
   return (
-    <div className="card" style={{ maxWidth: 440, margin: "0 auto" }}>
-      <h2>Payment — {order.slot || "Takeaway"}</h2>
-      <div className="row"><span>Total Due</span><b>{tk(order.total)}</b></div>
-      <p>
-        <label>
-          Amount tendered:
-          <input
-            style={{ width: "100%", marginTop: ".4rem" }}
-            value={amt}
-            onChange={(e) => setAmt(e.target.value)}
-            inputMode="decimal"
-          />
-        </label>
-      </p>
-      <div className="grid" style={{ marginBottom: "1rem" }}>
-        {["cash", "card", "mfs", "delivery_app", "other"].map((m) => (
-          <button
-            key={m}
-            type="button"
-            className={m === method ? "primary" : ""}
-            onClick={() => setMethod(m)}
-          >
-            {m.replace("_", " ")}
-          </button>
-        ))}
-      </div>
-      {err && <p className="err">{err}</p>}
+    <div className="card" style={{ maxWidth: 480, margin: "0 auto" }}>
       <div className="row">
-        <button onClick={onDone}>Cancel</button>
-        <button className="primary" onClick={go}>Take Payment</button>
+        <h2 style={{ margin: 0 }}>Payment · {order.slot || "Order"}</h2>
+        <button className="secondary" onClick={printBill}>🖨 Print Bill First</button>
+      </div>
+
+      <div style={{ background: "var(--blue-light)", padding: "1rem", borderRadius: "8px", margin: "1rem 0" }}>
+        <div className="row" style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--blue-primary)" }}>
+          <span>Total Payable</span>
+          <span>{tk(order.total)}</span>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: "0.8rem" }}>
+        <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray)" }}>Payment Method</label>
+        <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginTop: "0.4rem" }}>
+          {["cash", "card", "mfs", "foodpanda", "other"].map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={m === method ? "primary" : ""}
+              onClick={() => setMethod(m)}
+            >
+              {m.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray)" }}>Amount Tendered (৳)</label>
+      <input
+        style={{ width: "100%", fontSize: "1.3rem", fontWeight: "bold", padding: "0.6rem", marginTop: "0.3rem" }}
+        value={amt}
+        onChange={(e) => setAmt(e.target.value)}
+        inputMode="decimal"
+      />
+
+      {/* POS Touchscreen Numpad */}
+      <div className="numpad">
+        {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "00"].map((n) => (
+          <button key={n} type="button" onClick={() => numpadPress(n)}>{n}</button>
+        ))}
+        <button type="button" className="action-btn" onClick={() => numpadPress("EXACT")}>Exact</button>
+        <button type="button" className="action-btn" onClick={() => numpadPress("DEL")}>⌫</button>
+        <button type="button" className="action-btn" onClick={() => numpadPress("C")}>Clear</button>
+      </div>
+
+      {err && <p style={{ color: "var(--red)", fontWeight: 600, margin: "0.6rem 0" }}>{err}</p>}
+
+      <div className="row" style={{ marginTop: "1.2rem" }}>
+        <button onClick={onDone}>Back</button>
+        <button className="primary" style={{ padding: "0.75rem 2rem", fontSize: "1.05rem" }} onClick={go}>Complete Payment</button>
+      </div>
+    </div>
+  );
+}
+
+function TableTransferModal({ order, tables, token, onClose, onSuccess }) {
+  const [targetSlot, setTargetSlot] = useState("");
+  const [err, setErr] = useState("");
+
+  const submit = async () => {
+    if (!targetSlot) return setErr("Select a target table");
+    try {
+      await api(`/orders/${order.id}/transfer`, token, { order_id: order.id, target_slot: targetSlot });
+      alert(`Order transferred to ${targetSlot}`);
+      onSuccess();
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+
+  return (
+    <div className="card" style={{ maxWidth: 420, margin: "1rem auto" }}>
+      <h3>Transfer Table #{order.slot}</h3>
+      <p>Move Order #{order.id} ({tk(order.total)}) to another available table.</p>
+      <select style={{ width: "100%", marginBottom: "1rem" }} value={targetSlot} onChange={e => setTargetSlot(e.target.value)}>
+        <option value="">-- Choose New Table --</option>
+        {tables.filter(t => t.id !== order.slot).map(t => (
+          <option key={t.id} value={t.id}>{t.label}</option>
+        ))}
+      </select>
+      {err && <p style={{ color: "var(--red)" }}>{err}</p>}
+      <div className="row">
+        <button onClick={onClose}>Cancel</button>
+        <button className="primary" onClick={submit}>Confirm Transfer</button>
       </div>
     </div>
   );
@@ -134,8 +215,8 @@ function VoidRefundModal({ order, token, onClose, onSuccess }) {
   const [err, setErr] = useState("");
 
   const submit = async () => {
-    if (!reason) return setErr("Please state a reason");
-    if (!managerPin) return setErr("Manager PIN is required");
+    if (!reason) return setErr("Please specify a reason");
+    if (!managerPin) return setErr("Manager authorization PIN is required");
     try {
       await api("/orders/void-refund", token, {
         order_id: order.id,
@@ -143,7 +224,7 @@ function VoidRefundModal({ order, token, onClose, onSuccess }) {
         reason,
         manager_pin: managerPin
       });
-      alert(`${type.toUpperCase()} recorded successfully`);
+      alert(`${type.toUpperCase()} approved and logged to ledger.`);
       onSuccess();
     } catch (e) {
       setErr(e.message);
@@ -152,27 +233,27 @@ function VoidRefundModal({ order, token, onClose, onSuccess }) {
 
   return (
     <div className="card" style={{ maxWidth: 460, margin: "1rem auto" }}>
-      <h3>{type === "void" ? "Void Order" : "Refund Paid Order"} #{order.id}</h3>
-      <p>Order Total: <b>{tk(order.total)}</b> | Status: <b>{order.status}</b></p>
+      <h3 style={{ color: "var(--red)" }}>{type === "void" ? "Void Order" : "Refund Paid Order"} #{order.id}</h3>
+      <p>Amount: <b>{tk(order.total)}</b> | Table/Slot: <b>{order.slot}</b></p>
       <p>
-        <label>Type: </label>
-        <select value={type} onChange={e => setType(e.target.value)}>
-          {order.status !== "paid" && <option value="void">Void (Cancel Unpaid)</option>}
-          {order.status === "paid" && <option value="refund">Refund (Return Cash/Funds)</option>}
+        <label style={{ fontSize: "0.85rem", fontWeight: 600 }}>Action Type</label>
+        <select style={{ width: "100%", marginTop: "0.3rem" }} value={type} onChange={e => setType(e.target.value)}>
+          {order.status !== "paid" && <option value="void">Void (Cancel Unsettled Order)</option>}
+          {order.status === "paid" && <option value="refund">Refund (Customer Reimbursement)</option>}
         </select>
       </p>
       <p>
-        <label>Reason for {type}:</label>
-        <input style={{ width: "100%", marginTop: ".3rem" }} placeholder="e.g. Customer cancelled / Incorrect item" value={reason} onChange={e => setReason(e.target.value)} />
+        <label style={{ fontSize: "0.85rem", fontWeight: 600 }}>Reason for Void/Refund</label>
+        <input style={{ width: "100%", marginTop: "0.3rem" }} placeholder="Customer cancellation / Kitchen error" value={reason} onChange={e => setReason(e.target.value)} />
       </p>
       <p>
-        <label>Manager / Owner Authorization PIN:</label>
-        <input type="password" style={{ width: "100%", marginTop: ".3rem" }} placeholder="Enter 4-digit PIN (default: 1234 or 9999)" value={managerPin} onChange={e => setManagerPin(e.target.value)} />
+        <label style={{ fontSize: "0.85rem", fontWeight: 600 }}>Manager Approval PIN</label>
+        <input type="password" style={{ width: "100%", marginTop: "0.3rem" }} placeholder="••••" value={managerPin} onChange={e => setManagerPin(e.target.value)} />
       </p>
-      {err && <p className="err">{err}</p>}
-      <div className="row">
+      {err && <p style={{ color: "var(--red)", fontWeight: 600 }}>{err}</p>}
+      <div className="row" style={{ marginTop: "1rem" }}>
         <button onClick={onClose}>Back</button>
-        <button className="warn" onClick={submit}>Authorize {type}</button>
+        <button className="warn" onClick={submit}>Authorize {type.toUpperCase()}</button>
       </div>
     </div>
   );
@@ -180,6 +261,7 @@ function VoidRefundModal({ order, token, onClose, onSuccess }) {
 
 function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
   const [items, setItems] = useState([]);
+  const [category, setCategory] = useState("All");
   const [cart, setCart] = useState({});
   const [waiter, setWaiter] = useState("");
   const [err, setErr] = useState("");
@@ -187,6 +269,9 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
   useEffect(() => {
     api("/items", token).then(setItems).catch(() => {});
   }, [token]);
+
+  const categories = ["All", ...new Set(items.map(i => i.category || "General"))];
+  const filteredItems = category === "All" ? items : items.filter(i => (i.category || "General") === category);
 
   const sub = items.reduce((s, i) => s + i.price * (cart[i.id] || 0), 0);
   const vat = Math.round((sub * cfg.vat) / 100);
@@ -199,15 +284,15 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
     const lines = Object.entries(cart)
       .filter(([, q]) => q > 0)
       .map(([item_id, qty]) => ({ item_id: +item_id, qty }));
-    if (!lines.length) return setErr("Add at least one item");
-    if (channel === "dine_in" && !waiter) return setErr("Enter the waiter name");
+    if (!lines.length) return setErr("Please add at least one item");
+    if (channel === "dine_in" && !waiter) return setErr("Please select or enter the server/waiter name");
 
     const client_uuid = crypto.randomUUID();
     const payload = { client_uuid, channel, slot, waiter, lines };
 
     if (isOffline) {
       queueOutbox("create_order", payload, client_uuid);
-      alert("Offline mode: Order queued in outbox and will auto-sync!");
+      alert("Offline mode: Order queued in outbox.");
       const mockOrder = {
         id: "offline-" + client_uuid.slice(0, 6),
         client_uuid,
@@ -235,49 +320,76 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
   return (
     <div className="order">
       <div>
-        <h3>Select Menu Items</h3>
+        <div className="nav-tabs">
+          {categories.map(c => (
+            <button key={c} className={category === c ? "active" : ""} onClick={() => setCategory(c)}>
+              {c}
+            </button>
+          ))}
+        </div>
+
         <div className="grid">
-          {items.map((i) => (
+          {filteredItems.map((i) => (
             <button key={i.id} className="tile" onClick={() => add(i.id, 1)}>
-              <span>{i.name}</span>
-              <small>{tk(i.price)} · <span style={{ color: "var(--teal)" }}>{i.station}</span></small>
+              <div>
+                <span style={{ fontSize: "0.95rem" }}>{i.name}</span>
+                <div style={{ fontSize: "0.75rem", color: "var(--gray)", marginTop: "2px" }}>
+                  <span style={{ background: "var(--blue-light)", color: "var(--blue-primary)", padding: "1px 5px", borderRadius: "4px" }}>
+                    {i.station}
+                  </span>
+                </div>
+              </div>
+              <b style={{ color: "var(--blue-primary)", fontSize: "1.05rem" }}>{tk(i.price)}</b>
             </button>
           ))}
         </div>
       </div>
+
       <div className="card">
-        <h2>{slot || "Order"}</h2>
+        <h2 style={{ margin: "0 0 0.8rem 0" }}>{slot || "Order"}</h2>
         {channel === "dine_in" && (
-          <p>
+          <p style={{ margin: "0 0 0.8rem 0" }}>
             <input
-              placeholder="Waiter name"
+              placeholder="Waiter / Server Name"
               value={waiter}
               onChange={(e) => setWaiter(e.target.value)}
-              style={{ width: "100%" }}
+              style={{ width: "100%", padding: "0.6rem" }}
             />
           </p>
         )}
-        {items
-          .filter((i) => cart[i.id])
-          .map((i) => (
-            <div className="row" key={i.id} style={{ marginBottom: ".4rem" }}>
-              <span>{i.name} × {cart[i.id]}</span>
-              <div>
-                <button onClick={() => add(i.id, -1)}>−</button>
-                <button onClick={() => add(i.id, 1)}>+</button>
+
+        <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+          {items
+            .filter((i) => cart[i.id])
+            .map((i) => (
+              <div className="row" key={i.id} style={{ marginBottom: "0.5rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.4rem" }}>
+                <div>
+                  <b>{i.name}</b>
+                  <div style={{ fontSize: "0.8rem", color: "var(--gray)" }}>{tk(i.price)} each</div>
+                </div>
+                <div className="row" style={{ gap: "0.3rem" }}>
+                  <button style={{ minHeight: "32px", padding: "0.2rem 0.6rem" }} onClick={() => add(i.id, -1)}>−</button>
+                  <span style={{ fontWeight: "bold", minWidth: "20px", textAlign: "center" }}>{cart[i.id]}</span>
+                  <button style={{ minHeight: "32px", padding: "0.2rem 0.6rem" }} onClick={() => add(i.id, 1)}>+</button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+        </div>
+
         <div className="sum">
           <div className="row"><span>Subtotal</span><span>{tk(sub)}</span></div>
-          <div className="row"><span>VAT {cfg.vat}%</span><span>{tk(vat)}</span></div>
-          {svc > 0 && <div className="row"><span>Service {cfg.service}%</span><span>{tk(svc)}</span></div>}
-          <div className="row"><b>Total</b><b>{tk(total)}</b></div>
+          <div className="row"><span>VAT ({cfg.vat}%)</span><span>{tk(vat)}</span></div>
+          {svc > 0 && <div className="row"><span>Service Charge ({cfg.service}%)</span><span>{tk(svc)}</span></div>}
+          <div className="row" style={{ fontSize: "1.15rem", fontWeight: "bold", color: "var(--blue-primary)", marginTop: "0.5rem" }}>
+            <span>Total</span><span>{tk(total)}</span>
+          </div>
         </div>
-        {err && <p className="err">{err}</p>}
-        <div className="row" style={{ marginTop: "1rem" }}>
-          <button onClick={onDone}>Back</button>
-          <button onClick={() => submit(false)}>Send to KOT</button>
+
+        {err && <p style={{ color: "var(--red)", fontWeight: 600 }}>{err}</p>}
+
+        <div className="row" style={{ marginTop: "1.2rem" }}>
+          <button onClick={onDone}>Cancel</button>
+          <button className="secondary" onClick={() => submit(false)}>Send to KOT</button>
           <button className="primary" onClick={() => submit(true)}>Pay Now</button>
         </div>
       </div>
@@ -289,9 +401,11 @@ function InventoryDailyBazarView({ token, onBack }) {
   const [tab, setTab] = useState("inventory");
   const [inventory, setInventory] = useState([]);
   const [bazar, setBazar] = useState([]);
+  const [movements, setMovements] = useState([]);
   const [selectedIng, setSelectedIng] = useState("");
   const [qty, setQty] = useState("");
   const [cost, setCost] = useState("");
+  const [wasteReason, setWasteReason] = useState("");
   const [msg, setMsg] = useState("");
 
   const refresh = async () => {
@@ -301,6 +415,8 @@ function InventoryDailyBazarView({ token, onBack }) {
       if (inv.length > 0 && !selectedIng) setSelectedIng(inv[0].id);
       const bz = await api("/inventory/daily-bazar", token);
       setBazar(bz);
+      const mv = await api("/inventory/movements", token);
+      setMovements(mv);
     } catch (e) {
       setMsg(e.message);
     }
@@ -309,7 +425,7 @@ function InventoryDailyBazarView({ token, onBack }) {
   useEffect(() => { refresh(); }, [token]);
 
   const recordBazar = async () => {
-    if (!qty || !cost) return setMsg("Please fill in quantity and total cost");
+    if (!qty || !cost) return setMsg("Enter quantity and cost");
     try {
       await api("/inventory/daily-bazar", token, {
         ingredient_id: parseInt(selectedIng),
@@ -317,157 +433,126 @@ function InventoryDailyBazarView({ token, onBack }) {
         total_cost: Math.round(parseFloat(cost) * 100)
       });
       setMsg("Daily Bazar purchase recorded!");
-      setQty("");
-      setCost("");
+      setQty(""); setCost("");
       refresh();
-    } catch (e) {
-      setMsg(e.message);
-    }
+    } catch (e) { setMsg(e.message); }
+  };
+
+  const recordWastage = async () => {
+    if (!qty || !wasteReason) return setMsg("Enter quantity and reason");
+    try {
+      await api("/inventory/wastage", token, {
+        ingredient_id: parseInt(selectedIng),
+        qty_lost: parseInt(qty),
+        reason: wasteReason
+      });
+      setMsg("Wastage recorded and subtracted from stock.");
+      setQty(""); setWasteReason("");
+      refresh();
+    } catch (e) { setMsg(e.message); }
   };
 
   return (
     <div className="card">
       <div className="row">
-        <h2>Inventory & Daily Bazar</h2>
+        <h2 style={{ margin: 0, color: "var(--blue-primary)" }}>Inventory & Stock Management</h2>
         <button onClick={onBack}>Back to POS</button>
       </div>
-      <div className="nav-tabs">
-        <button className={tab === "inventory" ? "active" : ""} onClick={() => setTab("inventory")}>Stock & Auto-Deduct</button>
+
+      <div className="nav-tabs" style={{ marginTop: "1rem" }}>
+        <button className={tab === "inventory" ? "active" : ""} onClick={() => setTab("inventory")}>Stock Levels</button>
         <button className={tab === "bazar" ? "active" : ""} onClick={() => setTab("bazar")}>Daily Bazar Entry</button>
+        <button className={tab === "wastage" ? "active" : ""} onClick={() => setTab("wastage")}>Wastage / Adjustment</button>
+        <button className={tab === "movements" ? "active" : ""} onClick={() => setTab("movements")}>Stock Movement Ledger</button>
       </div>
-      {msg && <p className="ok-msg" onClick={() => setMsg("")}>{msg}</p>}
+
+      {msg && <p style={{ color: "var(--green)", fontWeight: 600 }}>{msg}</p>}
 
       {tab === "inventory" && (
-        <div>
-          <p>Current Raw Ingredient Stock Levels (automatically deducted when orders are placed):</p>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Ingredient</th>
-                <th>Unit</th>
-                <th>Current Stock</th>
-                <th>Cost / Unit</th>
+        <table className="data-table">
+          <thead>
+            <tr><th>Ingredient</th><th>Unit</th><th>Current Stock</th><th>Cost/Unit</th></tr>
+          </thead>
+          <tbody>
+            {inventory.map(i => (
+              <tr key={i.id}>
+                <td><b>{i.name}</b></td>
+                <td>{i.unit}</td>
+                <td><span style={{ fontWeight: 600 }}>{i.current_stock}</span> {i.unit}</td>
+                <td>{tk(i.cost_per_unit)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {inventory.map(i => (
-                <tr key={i.id}>
-                  <td><b>{i.name}</b></td>
-                  <td>{i.unit}</td>
-                  <td>{i.current_stock} {i.unit}</td>
-                  <td>{tk(i.cost_per_unit)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       )}
 
       {tab === "bazar" && (
         <div>
-          <h3>Record Daily Market Purchase (Bazar)</h3>
-          <div className="card" style={{ maxWidth: 440, marginBottom: "1.5rem" }}>
+          <div className="card" style={{ maxWidth: 440, margin: "1rem 0" }}>
+            <h3>Record Market Purchase</h3>
             <p>
-              <label>Select Ingredient:</label>
+              <label>Ingredient</label>
               <select style={{ width: "100%" }} value={selectedIng} onChange={e => setSelectedIng(e.target.value)}>
                 {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
               </select>
             </p>
             <p>
-              <label>Quantity Purchased:</label>
-              <input style={{ width: "100%" }} type="number" placeholder="e.g. 5000" value={qty} onChange={e => setQty(e.target.value)} />
+              <label>Quantity</label>
+              <input style={{ width: "100%" }} type="number" placeholder="5000" value={qty} onChange={e => setQty(e.target.value)} />
             </p>
             <p>
-              <label>Total Cost (৳):</label>
-              <input style={{ width: "100%" }} type="number" placeholder="e.g. 500" value={cost} onChange={e => setCost(e.target.value)} />
+              <label>Total Cost (৳)</label>
+              <input style={{ width: "100%" }} type="number" placeholder="500" value={cost} onChange={e => setCost(e.target.value)} />
             </p>
             <button className="primary" onClick={recordBazar}>Save Bazar Purchase</button>
           </div>
-
-          <h3>Recent Bazar History</h3>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Item</th>
-                <th>Qty</th>
-                <th>Total Cost</th>
-                <th>Recorded By</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bazar.map(b => (
-                <tr key={b.id}>
-                  <td>{b.purchased_at.slice(0, 16).replace("T", " ")}</td>
-                  <td>{b.ingredient_name}</td>
-                  <td>{b.qty_purchased} {b.unit}</td>
-                  <td>{tk(b.total_cost)}</td>
-                  <td>{b.purchased_by}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
-    </div>
-  );
-}
 
-function PrintAgentMonitor({ token, onBack }) {
-  const [jobs, setJobs] = useState([]);
-  const [station, setStation] = useState("");
+      {tab === "wastage" && (
+        <div>
+          <div className="card" style={{ maxWidth: 440, margin: "1rem 0" }}>
+            <h3>Record Ingredient Spoilage / Wastage</h3>
+            <p>
+              <label>Ingredient</label>
+              <select style={{ width: "100%" }} value={selectedIng} onChange={e => setSelectedIng(e.target.value)}>
+                {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+              </select>
+            </p>
+            <p>
+              <label>Quantity Lost</label>
+              <input style={{ width: "100%" }} type="number" placeholder="200" value={qty} onChange={e => setQty(e.target.value)} />
+            </p>
+            <p>
+              <label>Reason</label>
+              <input style={{ width: "100%" }} placeholder="Expired / spilled / prep mistake" value={wasteReason} onChange={e => setWasteReason(e.target.value)} />
+            </p>
+            <button className="warn" onClick={recordWastage}>Deduct as Wastage</button>
+          </div>
+        </div>
+      )}
 
-  const fetchJobs = async () => {
-    try {
-      const data = await api(`/printers/jobs?status=pending${station ? "&station=" + station : ""}`, token);
-      setJobs(data);
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    fetchJobs();
-    const iv = setInterval(fetchJobs, 3000);
-    return () => clearInterval(iv);
-  }, [station, token]);
-
-  const ack = async (id) => {
-    await api(`/printers/jobs/${id}/ack`, token, {});
-    fetchJobs();
-  };
-
-  return (
-    <div className="card">
-      <div className="row">
-        <h2>KOT & Bill Print Agent Dispatcher</h2>
-        <button onClick={onBack}>Back</button>
-      </div>
-      <p>Simulates the local print spooler/agent picking up station KOTs and customer bills.</p>
-      <div className="row" style={{ justifyContent: "flex-start", gap: "1rem" }}>
-        <label>Filter Station:</label>
-        <select value={station} onChange={e => setStation(e.target.value)}>
-          <option value="">All Stations</option>
-          <option value="kitchen">Kitchen</option>
-          <option value="bar">Bar</option>
-          <option value="counter">Counter</option>
-        </select>
-        <button onClick={fetchJobs}>Refresh</button>
-      </div>
-
-      <div style={{ marginTop: "1rem" }}>
-        {jobs.length === 0 ? <p>No pending print jobs in queue.</p> : (
-          jobs.map(j => (
-            <div key={j.id} className="card" style={{ marginBottom: "1rem", background: "#fbfcfb" }}>
-              <div className="row">
-                <b>Job #{j.id} · Station: {j.station.toUpperCase()} · Type: {j.type}</b>
-                <button className="primary" onClick={() => ack(j.id)}>Simulate Print (Ack)</button>
-              </div>
-              <pre style={{ background: "#222", color: "#68d391", padding: "1rem", borderRadius: "6px", overflowX: "auto" }}>
-                {j.payload}
-              </pre>
-            </div>
-          ))
-        )}
-      </div>
+      {tab === "movements" && (
+        <table className="data-table">
+          <thead>
+            <tr><th>Timestamp</th><th>Ingredient</th><th>Type</th><th>Change</th><th>Cost</th><th>Reason</th></tr>
+          </thead>
+          <tbody>
+            {movements.map(m => (
+              <tr key={m.id}>
+                <td>{m.date.slice(0, 16).replace("T", " ")}</td>
+                <td><b>{m.ingredient_name}</b></td>
+                <td><span style={{ textTransform: "capitalize" }}>{m.type.replace("_", " ")}</span></td>
+                <td style={{ color: m.qty_change < 0 ? "var(--red)" : "var(--green)", fontWeight: 600 }}>
+                  {m.qty_change > 0 ? `+${m.qty_change}` : m.qty_change} {m.unit}
+                </td>
+                <td>{tk(m.cost_paisa)}</td>
+                <td>{m.reason}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -495,7 +580,7 @@ function TableLayoutEditor({ token, onBack }) {
       if (t.id === draggingId) {
         return {
           ...t,
-          x: Math.max(10, Math.min(700, e.clientX - offset.x)),
+          x: Math.max(10, Math.min(750, e.clientX - offset.x)),
           y: Math.max(10, Math.min(420, e.clientY - offset.y))
         };
       }
@@ -513,7 +598,7 @@ function TableLayoutEditor({ token, onBack }) {
   const save = async () => {
     try {
       await api("/layout", token, { channel: "dine_in", layout: tables });
-      setMsg("Table layout saved successfully!");
+      setMsg("Table layout saved!");
     } catch (e) {
       setMsg(e.message);
     }
@@ -522,15 +607,15 @@ function TableLayoutEditor({ token, onBack }) {
   return (
     <div className="card" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
       <div className="row">
-        <h2>Interactive Draggable Table Floor Plan</h2>
+        <h2 style={{ margin: 0, color: "var(--blue-primary)" }}>Interactive Table Floor Plan</h2>
         <div>
-          <button onClick={addTable} style={{ marginRight: ".5rem" }}>+ Add Table</button>
-          <button className="primary" onClick={save} style={{ marginRight: ".5rem" }}>Save Layout</button>
+          <button className="secondary" onClick={addTable} style={{ marginRight: "0.5rem" }}>+ Add Table</button>
+          <button className="primary" onClick={save} style={{ marginRight: "0.5rem" }}>Save Layout</button>
           <button onClick={onBack}>Back</button>
         </div>
       </div>
-      <p style={{ color: "var(--gray)" }}>Click and drag any table to reposition it on the restaurant floor.</p>
-      {msg && <p className="ok-msg">{msg}</p>}
+      <p style={{ color: "var(--gray)", fontSize: "0.9rem" }}>Drag tables to match your restaurant floor plan.</p>
+      {msg && <p style={{ color: "var(--green)", fontWeight: 600 }}>{msg}</p>}
 
       <div className="floor-canvas">
         {tables.map(t => (
@@ -553,101 +638,6 @@ function TableLayoutEditor({ token, onBack }) {
   );
 }
 
-function SuperAdminBillingView({ token, onBack }) {
-  const [tenants, setTenants] = useState([]);
-  const [newCode, setNewCode] = useState("");
-  const [newName, setNewName] = useState("");
-  const [msg, setMsg] = useState("");
-
-  const refresh = async () => {
-    try {
-      const data = await api("/super-admin/tenants", token);
-      setTenants(data);
-    } catch (e) {
-      setMsg(e.message);
-    }
-  };
-
-  useEffect(() => { refresh(); }, [token]);
-
-  const createTenant = async () => {
-    if (!newCode || !newName) return setMsg("Please enter tenant code and name");
-    try {
-      await api("/super-admin/tenants", token, {
-        code: newCode,
-        name: newName,
-        admin_emp_id: "1001",
-        admin_password: "admin" + newCode
-      });
-      setMsg("New tenant created successfully!");
-      setNewCode("");
-      setNewName("");
-      refresh();
-    } catch (e) {
-      setMsg(e.message);
-    }
-  };
-
-  const toggleTenant = async (id) => {
-    try {
-      await api(`/super-admin/tenants/${id}/toggle-status`, token, {});
-      refresh();
-    } catch (e) {
-      setMsg(e.message);
-    }
-  };
-
-  return (
-    <div className="card">
-      <div className="row">
-        <h2>Super-Admin & Multi-Tenant Billing Hub</h2>
-        <button onClick={onBack}>Back</button>
-      </div>
-      <p>Tenant isolation, status toggling, and multi-branch management.</p>
-      {msg && <p className="ok-msg" onClick={() => setMsg("")}>{msg}</p>}
-
-      <div className="card" style={{ maxWidth: 440, margin: "1rem 0" }}>
-        <h3>Create New Tenant Branch</h3>
-        <p><input style={{ width: "100%" }} placeholder="Unique code (e.g. gulshan_branch)" value={newCode} onChange={e => setNewCode(e.target.value)} /></p>
-        <p><input style={{ width: "100%" }} placeholder="Branch / Restaurant name" value={newName} onChange={e => setNewName(e.target.value)} /></p>
-        <button className="primary" onClick={createTenant}>Provision Tenant</button>
-      </div>
-
-      <h3>Provisioned Tenants</h3>
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Code</th>
-            <th>Name</th>
-            <th>Total Orders</th>
-            <th>Users</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tenants.map(t => (
-            <tr key={t.id}>
-              <td>{t.id}</td>
-              <td><b>{t.code}</b></td>
-              <td>{t.name}</td>
-              <td>{t.order_count}</td>
-              <td>{t.user_count}</td>
-              <td><span className={t.active ? "ok-msg" : "err"}>{t.active ? "Active" : "Suspended"}</span></td>
-              <td>
-                <button onClick={() => toggleTenant(t.id)}>
-                  {t.active ? "Suspend" : "Activate"}
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export default function App() {
   const [me, setMe] = useState(null);
   const [view, setView] = useState({ name: "home" });
@@ -658,6 +648,7 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [outboxCount, setOutboxCount] = useState(getOutbox().length);
   const [voidRefundTarget, setVoidRefundTarget] = useState(null);
+  const [transferTarget, setTransferTarget] = useState(null);
   const [tablesLayout, setTablesLayout] = useState([]);
 
   const token = me?.token;
@@ -679,7 +670,7 @@ export default function App() {
     const res = await flushOutbox(token, api);
     setOutboxCount(getOutbox().length);
     if (res.synced > 0) {
-      setMsg(`Synced ${res.synced} offline items to server!`);
+      setMsg(`Synced ${res.synced} offline items!`);
       refresh();
     }
   };
@@ -700,9 +691,7 @@ export default function App() {
     refresh();
     const interval = setInterval(() => {
       setOutboxCount(getOutbox().length);
-      if (navigator.onLine && getOutbox().length > 0) {
-        triggerSync();
-      }
+      if (navigator.onLine && getOutbox().length > 0) triggerSync();
     }, 4000);
     return () => clearInterval(interval);
   }, [token, view.name]);
@@ -712,9 +701,9 @@ export default function App() {
   const home = () => setView({ name: "home" });
 
   const openShift = async () => {
-    const label = prompt("Shift name", "Shift 1");
+    const label = prompt("Shift label (e.g. Morning Shift)", "Shift 1");
     if (!label) return;
-    const c = parseFloat(prompt("Opening cash (৳)", "0") || "0");
+    const c = parseFloat(prompt("Opening cash in register (৳)", "0") || "0");
     try {
       await api("/shifts/open", token, { label, opening_cash: Math.round(c * 100) });
       refresh();
@@ -722,10 +711,10 @@ export default function App() {
   };
 
   const closeShift = async () => {
-    const c = parseFloat(prompt("Counted cash (৳)", "0") || "0");
+    const c = parseFloat(prompt("Counted cash in register (৳)", "0") || "0");
     try {
       const r = await api("/shifts/close", token, { closing_cash: Math.round(c * 100) });
-      setMsg(`Shift closed. Expected ${tk(r.expected_cash)}, counted ${tk(r.counted_cash)}, difference ${tk(r.difference)}`);
+      setMsg(`Shift closed. Expected: ${tk(r.expected_cash)}, Counted: ${tk(r.counted_cash)}, Diff: ${tk(r.difference)}`);
       refresh();
     } catch (e) { setMsg(e.message); }
   };
@@ -733,7 +722,7 @@ export default function App() {
   const report = async () => {
     try {
       const r = await api("/reports/daily", token);
-      setMsg(`Total: ${tk(r.total)} | Shifts: ${Object.entries(r.by_shift).map(([k, v]) => `${k}: ${tk(v)}`).join(", ")} | Cost: ${tk(r.total_cost)} (${r.food_cost_pct}%) | Voids/Refunds: ${tk(r.voids_refunds_total || 0)}`);
+      setMsg(`Total Sales: ${tk(r.total)} | Mushak VAT: ${tk(r.total_vat)} | Food Cost: ${tk(r.total_cost)} (${r.food_cost_pct}%) | Shifts: ${Object.entries(r.by_shift).map(([k, v]) => `${k}: ${tk(v)}`).join(", ")}`);
     } catch (e) { setMsg(e.message); }
   };
 
@@ -743,26 +732,29 @@ export default function App() {
   return (
     <>
       <header>
-        <div>
-          <b>EasyPOS · {me.tenant}</b>
-          <span style={{ marginLeft: "1rem" }} className={`status-badge ${isOnline ? "online" : "offline"}`}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <span className="brand-badge">⚡ {me.tenant}</span>
+          <span style={{ fontSize: "0.85rem", color: "var(--gray)" }}>({me.branch || "Uttara"})</span>
+          <span className={`status-badge ${isOnline ? "online" : "offline"}`}>
             {isOnline ? "● Online" : "○ Offline"}
           </span>
           {outboxCount > 0 && (
-            <button onClick={triggerSync} style={{ marginLeft: ".5rem", padding: ".2rem .5rem", fontSize: ".8rem" }}>
+            <button className="secondary" onClick={triggerSync} style={{ padding: "0.2rem 0.6rem", fontSize: "0.8rem", minHeight: "30px" }}>
               Sync Outbox ({outboxCount})
             </button>
           )}
         </div>
-        <span>{shift ? `${shift.label} (${tk(shift.opening_cash)})` : "No shift open"} · {me.name} ({me.role})</span>
-        <div>
-          {shift ? <button onClick={closeShift}>Close Shift</button> : <button onClick={openShift}>Open Shift</button>}{" "}
-          <button onClick={() => setMe(null)}>Log Out</button>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <span style={{ fontSize: "0.88rem" }}>
+            {shift ? <span style={{ color: "var(--blue-primary)", fontWeight: 600 }}>{shift.label} ({tk(shift.opening_cash)})</span> : "No shift open"} · {me.name} ({me.role})
+          </span>
+          {shift ? <button className="warn" style={{ minHeight: "36px", padding: "0.3rem 0.8rem" }} onClick={closeShift}>Close Shift</button> : <button className="primary" style={{ minHeight: "36px", padding: "0.3rem 0.8rem" }} onClick={openShift}>Open Shift</button>}
+          <button style={{ minHeight: "36px", padding: "0.3rem 0.8rem" }} onClick={() => setMe(null)}>Log Out</button>
         </div>
       </header>
 
       <main>
-        {msg && <p className="card ok-msg" onClick={() => setMsg("")}>{msg}</p>}
+        {msg && <p className="card" style={{ background: "var(--blue-light)", color: "var(--blue-primary)", fontWeight: 600 }} onClick={() => setMsg("")}>{msg}</p>}
 
         {voidRefundTarget && (
           <VoidRefundModal
@@ -773,44 +765,58 @@ export default function App() {
           />
         )}
 
+        {transferTarget && (
+          <TableTransferModal
+            order={transferTarget}
+            tables={tablesLayout}
+            token={token}
+            onClose={() => setTransferTarget(null)}
+            onSuccess={() => { setTransferTarget(null); refresh(); }}
+          />
+        )}
+
         {view.name === "home" && (
           <div>
             <div className="grid">
               {CHANNELS.map(([k, n]) => (
                 <button className="tile" key={k} onClick={() => setView({ name: "layout", channel: k })}>
-                  {n}
+                  <span style={{ fontSize: "1.05rem", color: "var(--blue-primary)" }}>{n}</span>
+                  <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Open orders</span>
                 </button>
               ))}
               <button className="tile" onClick={() => setView({ name: "inventory" })}>
-                Inventory & Bazar
-              </button>
-              <button className="tile" onClick={() => setView({ name: "print_agent" })}>
-                KOT / Print Spool
+                <span style={{ fontSize: "1.05rem", color: "var(--blue-primary)" }}>Inventory & Stock</span>
+                <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Bazar & Wastage</span>
               </button>
               <button className="tile" onClick={() => setView({ name: "table_editor" })}>
-                Table Floor Editor
+                <span style={{ fontSize: "1.05rem", color: "var(--blue-primary)" }}>Floor Plan</span>
+                <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Table Editor</span>
               </button>
-              {me.role === "owner" && (
-                <button className="tile" onClick={() => setView({ name: "super_admin" })}>
-                  Super Admin
-                </button>
-              )}
               <button className="tile" onClick={report}>
-                Reports (Food Cost %)
+                <span style={{ fontSize: "1.05rem", color: "var(--blue-primary)" }}>Reports</span>
+                <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Mushak 6.3 & Cost %</span>
               </button>
             </div>
 
             {open.length > 0 && (
               <div style={{ marginTop: "2rem" }}>
-                <h3>Active Open Orders ({open.length})</h3>
+                <h3 style={{ color: "var(--blue-primary)", margin: "0 0 1rem 0" }}>Active Open Orders ({open.length})</h3>
                 <div className="grid">
                   {open.map(o => (
-                    <div key={o.id} className="card" style={{ padding: ".8rem" }}>
-                      <b>#{o.id} - {o.slot}</b> ({o.channel})
-                      <div>Total: {tk(o.total)}</div>
-                      <div className="row" style={{ marginTop: ".5rem" }}>
-                        <button onClick={() => setView({ name: "pay", order: o })}>Pay</button>
-                        <button className="warn" onClick={() => setVoidRefundTarget(o)}>Void</button>
+                    <div key={o.id} className="card" style={{ padding: "1rem" }}>
+                      <div className="row">
+                        <b>#{o.id} · {o.slot}</b>
+                        <span style={{ background: "var(--blue-light)", color: "var(--blue-primary)", fontSize: "0.75rem", padding: "2px 6px", borderRadius: "4px" }}>
+                          {o.channel}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 700, margin: "0.5rem 0", color: "var(--blue-primary)" }}>
+                        {tk(o.total)}
+                      </div>
+                      <div className="row" style={{ marginTop: "0.5rem", gap: "0.3rem" }}>
+                        <button className="primary" style={{ minHeight: "34px", padding: "0.2rem 0.6rem" }} onClick={() => setView({ name: "pay", order: o })}>Pay</button>
+                        <button className="secondary" style={{ minHeight: "34px", padding: "0.2rem 0.6rem" }} onClick={() => setTransferTarget(o)}>Move</button>
+                        <button className="warn" style={{ minHeight: "34px", padding: "0.2rem 0.6rem" }} onClick={() => setVoidRefundTarget(o)}>Void</button>
                       </div>
                     </div>
                   ))}
@@ -822,11 +828,13 @@ export default function App() {
 
         {view.name === "layout" && (
           <div>
-            <div className="row">
-              <h3>{CHANNELS.find(c => c[0] === view.channel)?.[1] || view.channel} Layout</h3>
+            <div className="row" style={{ marginBottom: "1rem" }}>
+              <h3 style={{ margin: 0, color: "var(--blue-primary)" }}>
+                {CHANNELS.find(c => c[0] === view.channel)?.[1] || view.channel} Channel
+              </h3>
               <button onClick={home}>Back to Home</button>
             </div>
-            <div className="grid" style={{ marginTop: "1rem" }}>
+            <div className="grid">
               {slots.map((s) => {
                 const o = open.find((x) => x.channel === view.channel && x.slot === s);
                 return (
@@ -839,8 +847,8 @@ export default function App() {
                       else setMsg("Open a shift first");
                     }}
                   >
-                    <span>{s}</span>
-                    {o && <span>{tk(o.total)}</span>}
+                    <span style={{ fontSize: "1.1rem" }}>{s}</span>
+                    {o ? <b style={{ fontSize: "1.05rem" }}>{tk(o.total)}</b> : <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Available</span>}
                   </button>
                 );
               })}
@@ -870,9 +878,7 @@ export default function App() {
         )}
 
         {view.name === "inventory" && <InventoryDailyBazarView token={token} onBack={home} />}
-        {view.name === "print_agent" && <PrintAgentMonitor token={token} onBack={home} />}
         {view.name === "table_editor" && <TableLayoutEditor token={token} onBack={home} />}
-        {view.name === "super_admin" && <SuperAdminBillingView token={token} onBack={home} />}
       </main>
     </>
   );

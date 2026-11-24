@@ -1,21 +1,29 @@
 :root {
-  --ink: #14211f;
-  --paper: #f7f8f6;
-  --line: #cfd8d3;
-  --teal: #1f6f64;
-  --saffron: #f0a500;
-  --red: #b8392b;
-  --ok: #2d8a57;
-  --blue: #2563eb;
+  --ink: #0f172a;        /* Deep slate text */
+  --paper: #f8fafc;      /* Crisp light background */
+  --card-bg: #ffffff;    /* Pure white surfaces */
+  --line: #e2e8f0;       /* Crisp border lines */
+  --blue-primary: #1d4ed8;  /* Royal Blue */
+  --blue-hover: #1e40af;    /* Darker Blue */
+  --blue-light: #eff6ff;    /* Soft blue tint */
+  --blue-accent: #3b82f6;   /* Electric Blue */
+  --amber: #f59e0b;      /* Warm amber for active orders */
+  --amber-light: #fef3c7;
+  --red: #ef4444;        /* Soft warning red */
+  --red-light: #fee2e2;
+  --green: #10b981;      /* Emerald success */
+  --green-light: #d1fae5;
   --gray: #64748b;
+  --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  font: 15px/1.4 system-ui, -apple-system, sans-serif;
+  font: 14px/1.5 var(--font-main);
   background: var(--paper);
   color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
 
 button, input, select, textarea {
@@ -24,145 +32,157 @@ button, input, select, textarea {
 
 button {
   cursor: pointer;
-  border: 1.5px solid var(--ink);
-  background: #fff;
+  border: 1px solid var(--line);
+  background: #ffffff;
   color: var(--ink);
-  border-radius: 6px;
-  padding: .6rem 1rem;
-  min-height: 44px;
-  transition: all 0.15s ease;
+  border-radius: 8px;
+  padding: 0.65rem 1.1rem;
+  font-weight: 500;
+  min-height: 42px;
+  transition: all 0.15s ease-in-out;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
 button:hover {
-  background: #f0f4f2;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 button:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 3px solid var(--saffron);
+  outline: 2px solid var(--blue-accent);
   outline-offset: 2px;
 }
 
 button.primary {
-  background: var(--teal);
-  color: #fff;
-  border-color: var(--teal);
+  background: var(--blue-primary);
+  color: #ffffff;
+  border-color: var(--blue-primary);
+  box-shadow: 0 2px 4px rgba(29, 78, 216, 0.2);
 }
 button.primary:hover {
-  background: #17574e;
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+}
+
+button.secondary {
+  background: var(--blue-light);
+  color: var(--blue-primary);
+  border-color: #bfdbfe;
+}
+button.secondary:hover {
+  background: #dbeafe;
 }
 
 button.warn {
   border-color: var(--red);
   color: var(--red);
+  background: #ffffff;
 }
 button.warn:hover {
-  background: #ffebe9;
+  background: var(--red-light);
 }
 
+/* Header Navbar: White Clean Bar with Blue Accents */
 header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: .8rem 1.2rem;
-  background: var(--ink);
-  color: #fff;
+  padding: 0.75rem 1.5rem;
+  background: #ffffff;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
   flex-wrap: wrap;
 }
 
-header button {
-  background: transparent;
-  color: #fff;
-  border-color: #fff;
-  min-height: 38px;
-}
-header button:hover {
-  background: rgba(255,255,255,0.15);
+.brand-badge {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--blue-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: .4rem;
-  padding: .2rem .6rem;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 .status-badge.online {
-  background: #e6f4ea;
-  color: var(--ok);
+  background: var(--green-light);
+  color: #065f46;
 }
 .status-badge.offline {
-  background: #fce8e6;
-  color: var(--red);
+  background: var(--red-light);
+  color: #991b1b;
 }
 
 main {
-  padding: 1.2rem;
-  max-width: 1200px;
+  padding: 1.5rem;
+  max-width: 1240px;
   margin: 0 auto;
 }
 
 .grid {
   display: grid;
-  gap: .75rem;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 }
 
 .tile {
-  min-height: 90px;
+  min-height: 95px;
   text-align: left;
   font-weight: 600;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  background: #ffffff;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 0.85rem;
+}
+.tile:hover {
+  border-color: var(--blue-accent);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.05);
 }
 .tile.busy {
-  background: var(--saffron);
-  border-color: var(--saffron);
-  color: #000;
-}
-.tile.empty {
-  border-style: dashed;
-  color: #8a9a94;
-}
-
-.err {
-  color: var(--red);
-  font-weight: 600;
-}
-.ok-msg {
-  color: var(--ok);
-  font-weight: 600;
+  background: var(--amber-light);
+  border-color: var(--amber);
+  color: #92400e;
 }
 
 .card {
-  background: #fff;
+  background: #ffffff;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 1.2rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border-radius: 10px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
 
 .login {
-  max-width: 360px;
-  margin: 10vh auto;
+  max-width: 380px;
+  margin: 12vh auto;
   display: grid;
-  gap: .8rem;
+  gap: 0.85rem;
 }
 .login input {
-  padding: .8rem;
-  border: 1.5px solid var(--ink);
-  border-radius: 6px;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 .order {
   display: grid;
-  gap: 1.2rem;
-  grid-template-columns: 1fr 340px;
+  gap: 1.25rem;
+  grid-template-columns: 1fr 360px;
 }
-@media (max-width: 840px) {
+@media (max-width: 860px) {
   .order {
     grid-template-columns: 1fr;
   }
@@ -172,34 +192,58 @@ main {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: .5rem;
+  gap: 0.5rem;
 }
+
 .sum {
   border-top: 1px solid var(--line);
-  margin-top: .8rem;
-  padding-top: .8rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
 }
 
 .nav-tabs {
   display: flex;
-  gap: .5rem;
-  margin-bottom: 1rem;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
   flex-wrap: wrap;
 }
 .nav-tabs button.active {
-  background: var(--teal);
-  color: #fff;
-  border-color: var(--teal);
+  background: var(--blue-primary);
+  color: #ffffff;
+  border-color: var(--blue-primary);
 }
 
-/* Floor Canvas for Draggable Layout */
+/* On-screen Numeric Keypad for POS Payment */
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+.numpad button {
+  min-height: 52px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+}
+.numpad button:hover {
+  background: #e2e8f0;
+}
+.numpad button.action-btn {
+  background: var(--blue-light);
+  color: var(--blue-primary);
+  font-size: 1rem;
+}
+
+/* Floor Canvas */
 .floor-canvas {
   position: relative;
   width: 100%;
   height: 520px;
-  border: 2px dashed var(--line);
-  border-radius: 8px;
-  background: #fdfdfd;
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
   overflow: hidden;
   user-select: none;
 }
@@ -207,23 +251,25 @@ main {
 .floor-table {
   position: absolute;
   cursor: grab;
-  border: 2px solid var(--ink);
-  background: #fff;
+  border: 2px solid var(--blue-primary);
+  background: var(--blue-light);
+  color: var(--blue-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  font-weight: 700;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.06);
 }
 .floor-table.round {
   border-radius: 50%;
 }
 .floor-table.square {
-  border-radius: 8px;
+  border-radius: 10px;
 }
 .floor-table.busy {
-  background: var(--saffron);
-  border-color: #b57a00;
+  background: var(--amber-light);
+  border-color: var(--amber);
+  color: #92400e;
 }
 .floor-table:active {
   cursor: grabbing;
@@ -236,9 +282,11 @@ table.data-table {
 }
 table.data-table th, table.data-table td {
   border: 1px solid var(--line);
-  padding: .6rem;
+  padding: 0.65rem 0.85rem;
   text-align: left;
 }
 table.data-table th {
-  background: #f0f4f2;
+  background: #f8fafc;
+  font-weight: 600;
+  color: var(--gray);
 }
