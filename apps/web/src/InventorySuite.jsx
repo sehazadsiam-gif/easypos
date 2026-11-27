@@ -489,7 +489,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
   const warnings = activeBatch?.stock_warnings || [];
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "1rem", alignItems: "start" }}>
+    <div className="split-right">
       <div>
         <div className="card" style={{ border: "2px solid var(--blue-primary)", marginBottom: "1rem" }}>
           <div className="row" style={{ marginBottom: "0.75rem", flexWrap: "wrap" }}>
@@ -625,6 +625,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
           {lines.length === 0 ? (
             <p style={{ color: "var(--gray)" }}>Scan a barcode above or type a code and press Enter.</p>
           ) : (
+            <div className="table-scroll">
             <table className="data-table" style={{ width: "100%" }}>
               <thead>
                 <tr>
@@ -698,6 +699,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
 
           {isSale && warnings.length > 0 && (
@@ -1049,7 +1051,7 @@ function RecipesView({ token, api, userRole }) {
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: "1rem", alignItems: "start" }}>
+    <div className="split-left">
       <div className="card">
         <div className="row" style={{ marginBottom: "0.75rem" }}>
           <h4 style={{ margin: 0 }}>Menu Items ({recipes.length})</h4>
@@ -1121,6 +1123,7 @@ function RecipesView({ token, api, userRole }) {
               </div>
             )}
 
+            <div className="table-scroll">
             <table className="data-table" style={{ width: "100%" }}>
               <thead>
                 <tr><th>Bazar Item</th><th>Amount</th><th>Unit</th><th>Remove</th></tr>
@@ -1180,6 +1183,7 @@ function RecipesView({ token, api, userRole }) {
                 })}
               </tbody>
             </table>
+            </div>
 
             <div className="row" style={{ marginTop: "1rem" }}>
               <button className="secondary" onClick={saveDraft}>Save Draft</button>
@@ -1483,13 +1487,13 @@ function MenuApprovedView({ token, api, userRole }) {
             )}
           </p>
         </div>
-        <div>
+        <div style={{ flex: "1 1 200px", maxWidth: "280px" }}>
           <input
             type="text"
             placeholder="Search dish or barcode..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: "220px", padding: "6px 10px" }}
+            style={{ width: "100%", padding: "6px 10px" }}
           />
         </div>
       </div>
@@ -1718,6 +1722,7 @@ function InventoryOverviewView({ token, api, userRole }) {
           </div>
         </div>
 
+        <div className="table-scroll">
         <table className="data-table" style={{ width: "100%" }}>
           <thead>
             <tr>
@@ -1748,14 +1753,16 @@ function InventoryOverviewView({ token, api, userRole }) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+      <div className="split-equal">
         <div className="card">
           <h4 style={{ marginTop: 0, color: "var(--red)" }}>Shopping List ({lowItems.length} Low)</h4>
           {lowItems.length === 0 ? (
             <p style={{ color: "var(--gray)" }}>All items are above minimum stock.</p>
           ) : (
+            <div className="table-scroll">
             <table className="data-table" style={{ width: "100%" }}>
               <thead><tr><th>Item</th><th>Current</th><th>Min</th><th>Suggested Buy</th></tr></thead>
               <tbody>
@@ -1769,6 +1776,7 @@ function InventoryOverviewView({ token, api, userRole }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 
@@ -1823,6 +1831,7 @@ function InventoryOverviewView({ token, api, userRole }) {
             </select>
           </div>
         </div>
+        <div className="table-scroll">
         <table className="data-table" style={{ width: "100%" }}>
           <thead>
             <tr><th>Date</th><th>Item</th><th>Type</th><th>Qty</th><th>Who</th><th>Reason</th><th>Action</th></tr>
@@ -1849,6 +1858,7 @@ function InventoryOverviewView({ token, api, userRole }) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

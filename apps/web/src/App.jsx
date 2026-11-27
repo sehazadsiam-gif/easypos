@@ -876,7 +876,7 @@ function InventoryDailyBazarView({ token, onBack }) {
       {msg && <p style={{ color: "var(--blue-primary)", background: "var(--blue-light)", padding: "0.5rem", borderRadius: "6px", fontWeight: 600 }}>{msg}</p>}
 
       {tab === "scanner" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "1rem" }}>
+        <div className="split-right">
           <div>
             <div className="card" style={{ marginBottom: "1rem", border: "2px solid var(--blue-primary)" }}>
               <h3>Production Barcode Scanner Receiver</h3>
@@ -1228,13 +1228,13 @@ function BarcodeCatalogView({ token, onBack }) {
             Bazar Ingredients ({ingredients.length})
           </button>
         </div>
-        <div>
+        <div style={{ flex: "1 1 220px", maxWidth: "280px" }}>
           <input
             type="text"
             placeholder="Search name, MENU-, ING-..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: "260px", padding: "8px 12px", fontSize: "0.9rem" }}
+            style={{ width: "100%", padding: "8px 12px", fontSize: "0.9rem" }}
           />
         </div>
       </div>

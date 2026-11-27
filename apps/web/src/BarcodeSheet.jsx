@@ -235,7 +235,7 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
                     </h4>
                     <small style={{ color: "#64748b", fontSize: "0.75rem" }}>Category: {category}</small>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: density === "3col" ? "repeat(3, 1fr)" : "repeat(2, 1fr)", gap: "10px" }}>
+                  <div className={`barcode-sheet-grid ${density === "3col" ? "cols-3" : "cols-2"}`}>
                     {dishes.map((m) => (
                       <div
                         key={m.id || m.barcode}
@@ -292,7 +292,7 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
                     </h4>
                     <small style={{ color: "#64748b", fontSize: "0.75rem" }}>Department Intake</small>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: density === "3col" ? "repeat(3, 1fr)" : "repeat(2, 1fr)", gap: "10px" }}>
+                  <div className={`barcode-sheet-grid ${density === "3col" ? "cols-3" : "cols-2"}`}>
                     {ingList.map((item) => (
                       <div
                         key={item.id || item.barcode}
@@ -338,7 +338,7 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
                 Scan After Item to Multiply
               </span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: density === "3col" ? "repeat(3, 1fr)" : "repeat(2, 1fr)", gap: "10px" }}>
+            <div className={`barcode-sheet-grid ${density === "3col" ? "cols-3" : "cols-2"}`}>
               {quantityCodes.map((q) => (
                 <div
                   key={q.code}
