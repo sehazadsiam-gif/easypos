@@ -10,26 +10,39 @@ from app.models import (
 from app.security import hp
 
 
-def _ensure_sqlite_columns():
-    """Add any new columns to existing SQLite tables if upgrading an existing DB."""
-    if not str(engine.url).startswith("sqlite"):
-        return
+def _ensure_columns():
+    """Add any missing columns to existing SQLite or PostgreSQL tables."""
     migrations = [
         ("items", "barcode", "VARCHAR"),
+        ("items", "station", "VARCHAR DEFAULT 'kitchen'"),
+        ("items", "image_url", "VARCHAR"),
         ("ingredients", "barcode", "VARCHAR"),
+        ("ingredients", "pack_size", "FLOAT DEFAULT 1.0"),
+        ("ingredients", "pack_unit", "VARCHAR DEFAULT 'pcs'"),
         ("ingredients", "min_stock", "INTEGER DEFAULT 0"),
+        ("ingredients", "current_stock", "INTEGER DEFAULT 0"),
+        ("ingredients", "cost_per_unit", "INTEGER DEFAULT 0"),
         ("recipe_items", "recipe_id", "INTEGER"),
         ("recipe_items", "input_amount", "FLOAT"),
         ("recipe_items", "input_unit", "VARCHAR"),
+        ("recipe_items", "version", "INTEGER DEFAULT 1"),
+        ("stock_ledger", "ref_ledger_id", "INTEGER"),
+        ("stock_ledger", "reason", "VARCHAR"),
     ]
+    is_sqlite = str(engine.url).startswith("sqlite")
     with engine.begin() as conn:
         for table, col, col_type in migrations:
             try:
-                cols = [r[1] for r in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()]
-                if col not in cols:
-                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
-            except Exception:
-                pass
+                if is_sqlite:
+                    cols = [r[1] for r in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()]
+                    if col not in cols:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                else:
+                    # PostgreSQL supports ADD COLUMN IF NOT EXISTS natively
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+            except Exception as e:
+                import logging
+                logging.getLogger("easypos.migration").warning(f"Could not migrate {table}.{col}: {e}")
 
 
 CROWN_ITEMS = [{'category': 'Appetizers', 'name': 'Japanese Tori Karaage', 'barcode': 'MENU-JAPANESE-TOR', 'price': None, 'station': 'kitchen'}, {'category': 'Appetizers', 'name': 'Yakiniku Beef Sushi Roll', 'barcode': 'MENU-YAKINIKU-BEE', 'price': None, 'station': 'kitchen'}, {'category': 'Appetizers', 'name': 'Golden Crispy Fish & Chips', 'barcode': 'MENU-GOLDEN-CRISP', 'price': None, 'station': 'kitchen'}, {'category': 'Appetizers', 'name': 'Crispy Chicken Pops', 'barcode': 'MENU-CRISPY-CHICK', 'price': None, 'station': 'kitchen'}, {'category': 'Appetizers', 'name': 'Japanese Chicken Nanban', 'barcode': 'MENU-JAPANESE-CHI', 'price': None, 'station': 'kitchen'}, {'category': 'Appetizers', 'name': 'Japanese Chicken Gyoza', 'barcode': 'MENU-JAPANESE-CHI-2', 'price': None, 'station': 'kitchen'}, {'category': 'Sandwiches', 'name': 'Firefold chicken sandwich', 'barcode': 'MENU-FIREFOLD-CHI', 'price': None, 'station': 'kitchen'}, {'category': 'Sandwiches', 'name': 'Honey Mustard Crispy Chicken Sandwich', 'barcode': 'MENU-HONEY-MUSTAR', 'price': None, 'station': 'kitchen'}, {'category': 'Sandwiches', 'name': 'Classic Triple-Decker Club', 'barcode': 'MENU-CLASSIC-TRIP', 'price': None, 'station': 'kitchen'}, {'category': 'Sandwiches', 'name': 'Roast Beef & Herb Sandwich', 'barcode': 'MENU-ROAST-BEEF-H', 'price': None, 'station': 'kitchen'}, {'category': 'Sandwiches', 'name': 'Golden Crispy Chicken Bagel', 'barcode': 'MENU-GOLDEN-CRISP-2', 'price': None, 'station': 'kitchen'}, {'category': 'Sandwiches', 'name': 'Smoky BBQ Beef Bagel', 'barcode': 'MENU-SMOKY-BBQ-BE', 'price': None, 'station': 'kitchen'}, {'category': 'Croissants', 'name': 'Creamy Alfredo Chicken Croissant', 'barcode': 'MENU-CREAMY-ALFRE', 'price': None, 'station': 'kitchen'}, {'category': 'Croissants', 'name': 'Parisian Roast Beef Croissant', 'barcode': 'MENU-PARISIAN-ROA', 'price': None, 'station': 'kitchen'}, {'category': 'Croissants', 'name': 'Velvet Vine', 'barcode': 'MENU-VELVET-VINE', 'price': None, 'station': 'kitchen'}, {'category': 'Pasta', 'name': 'Garlic-Infused Prawn Aglio e Olio', 'barcode': 'MENU-GARLIC-INFUS', 'price': None, 'station': 'kitchen'}, {'category': 'Pasta', 'name': 'Creamy Chicken Alfredo Pasta', 'barcode': 'MENU-CREAMY-CHICK', 'price': None, 'station': 'kitchen'}, {'category': 'Noodles', 'name': 'Japanese Yakisoba - Chicken', 'barcode': 'MENU-JAPANESE-YAK', 'price': None, 'station': 'kitchen'}, {'category': 'Noodles', 'name': 'Japanese Yakisoba - Seafood', 'barcode': 'MENU-JAPANESE-YAK-2', 'price': None, 'station': 'kitchen'}, {'category': 'Noodles', 'name': 'Japanese Yakisoba - Vegetable', 'barcode': 'MENU-JAPANESE-YAK-3', 'price': None, 'station': 'kitchen'}, {'category': 'Noodles', 'name': 'Authentic Thai Pad Thai', 'barcode': 'MENU-AUTHENTIC-TH', 'price': None, 'station': 'kitchen'}, {'category': 'Main Course', 'name': 'Japanese Teriyaki Chicken', 'barcode': 'MENU-JAPANESE-TER', 'price': None, 'station': 'kitchen'}, {'category': 'Main Course', 'name': 'Herb-Crusted Chicken Roulade', 'barcode': 'MENU-HERB-CRUSTED', 'price': None, 'station': 'kitchen'}, {'category': 'Main Course', 'name': 'Mongolian Sizzling Beef Platter', 'barcode': 'MENU-MONGOLIAN-SI', 'price': None, 'station': 'kitchen'}, {'category': 'Desserts', 'name': 'Warm Chocolate Fudge Brownie', 'barcode': 'MENU-WARM-CHOCOLA', 'price': None, 'station': 'kitchen'}, {'category': 'Desserts', 'name': 'Silky Baked Yogurt', 'barcode': 'MENU-SILKY-BAKED-', 'price': None, 'station': 'kitchen'}, {'category': 'Desserts', 'name': 'Creme Dor', 'barcode': 'MENU-CREME-DOR', 'price': None, 'station': 'kitchen'}, {'category': 'Salads', 'name': 'Oriental Cashew Crunch Salad', 'barcode': 'MENU-ORIENTAL-CAS', 'price': None, 'station': 'kitchen'}, {'category': 'Salads', 'name': 'Oriental Sesame Glazed Chicken Salad', 'barcode': 'MENU-ORIENTAL-SES', 'price': None, 'station': 'kitchen'}, {'category': 'Side dish', 'name': 'Fried rice', 'barcode': 'MENU-FRIED-RICE', 'price': None, 'station': 'kitchen'}, {'category': 'Appetizers', 'name': 'Crown Firecracker Wings', 'barcode': 'MENU-CROWN-FIRECR', 'price': None, 'station': 'kitchen'}]
@@ -42,7 +55,7 @@ CROWN_RECIPES = {'Japanese Tori Karaage': [{'ingredient': 'Chicken thigh (bonele
 def seed():
     wait_for_db()
     Base.metadata.create_all(engine)
-    _ensure_sqlite_columns()
+    _ensure_columns()
     db = Session()
     try:
         t = db.query(Tenant).filter(Tenant.code == "crown").first()
