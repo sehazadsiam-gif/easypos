@@ -1121,12 +1121,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
    Print Styles (A4 Sheet Barcode Optimization)
    ========================================================================== */
 @media print {
-  .barcode-sheet-grid.cols-3 {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
-  .barcode-sheet-grid.cols-2 {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
   @page {
     size: A4 portrait;
     margin: 8mm 8mm 8mm 8mm;
@@ -1134,20 +1128,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   html, body {
     background: #ffffff !important;
     color: #000000 !important;
-    font-size: 10pt !important;
+    font-size: 9.5pt !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
   }
-  #root {
+  #root, main {
     margin: 0 !important;
     padding: 0 !important;
     max-width: 100% !important;
+    overflow: visible !important;
+    animation: none !important;
   }
   .no-print, header, nav, .toast-msg, button, .nav-tabs {
     display: none !important;
   }
   .print-only-header {
     display: block !important;
+    margin-bottom: 10px !important;
   }
   .card {
     box-shadow: none !important;
@@ -1155,11 +1154,26 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     padding: 0 !important;
     margin: 0 !important;
     background: #ffffff !important;
+    animation: none !important;
   }
   .barcode-print-container {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+  }
+  .barcode-sheet-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    align-items: stretch !important;
+  }
+  .barcode-sheet-grid.cols-3 > .barcode-label-card {
+    width: calc(33.333% - 4.5px) !important;
+    box-sizing: border-box !important;
+  }
+  .barcode-sheet-grid.cols-2 > .barcode-label-card {
+    width: calc(50% - 3.5px) !important;
+    box-sizing: border-box !important;
   }
   .barcode-label-card {
     break-inside: avoid !important;
@@ -1167,6 +1181,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     border: 1px solid #475569 !important;
     box-shadow: none !important;
     background: #ffffff !important;
+    padding: 6px !important;
   }
   .barcode-category-header {
     break-after: avoid !important;

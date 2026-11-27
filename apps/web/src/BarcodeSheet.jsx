@@ -228,8 +228,8 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
             {Object.entries(groupedDishes).map(([category, dishes]) => {
               if (specificCategory !== "all" && specificCategory !== category) return null;
               return (
-                <div key={category} style={{ marginBottom: "1.5rem", pageBreakInside: "avoid" }}>
-                  <div style={{ borderBottom: "1.5px solid #6366f1", paddingBottom: "4px", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div key={category} style={{ marginBottom: "1.25rem" }}>
+                  <div className="barcode-category-header" style={{ borderBottom: "1.5px solid #6366f1", paddingBottom: "4px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                     <h4 style={{ margin: 0, color: "#312e81", fontSize: "1rem", fontWeight: 800 }}>
                       • {category} ({dishes.length} Items)
                     </h4>
@@ -285,8 +285,8 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
             {Object.entries(groupedIngredients).map(([dept, ingList]) => {
               if (specificCategory !== "all" && specificCategory !== dept) return null;
               return (
-                <div key={dept} style={{ marginBottom: "1.5rem", pageBreakInside: "avoid" }}>
-                  <div style={{ borderBottom: "1.5px solid #10b981", paddingBottom: "4px", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div key={dept} style={{ marginBottom: "1.25rem" }}>
+                  <div className="barcode-category-header" style={{ borderBottom: "1.5px solid #10b981", paddingBottom: "4px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                     <h4 style={{ margin: 0, color: "#065f46", fontSize: "1rem", fontWeight: 800 }}>
                       {dept} ({ingList.length} Items)
                     </h4>
@@ -311,7 +311,7 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
                         }}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#64748b", fontWeight: 700, borderBottom: "1px solid #f1f5f9", paddingBottom: "3px", marginBottom: "4px" }}>
-                          <span>{dept.split(" ")[1] || "BAZAR"}</span>
+                          <span>{dept.split(" ")[0].replace(",", "") || "BAZAR"}</span>
                           <span style={{ color: "#0f766e" }}>{item.pack_unit || `${item.pack_size || 100}${item.base_unit || item.unit}`}</span>
                         </div>
                         <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "#0f172a", margin: "2px 0 4px", lineHeight: 1.2, minHeight: "28px", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -329,7 +329,7 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
 
         {/* 3. QUANTITY MODIFIERS (COUNTER CHEAT SHEET) */}
         {showModifiers && (
-          <div style={{ marginBottom: "2rem", pageBreakInside: "avoid" }}>
+          <div style={{ marginBottom: "1.25rem" }}>
             <div className="barcode-category-header" style={{ background: "#4338ca", color: "#ffffff", padding: "8px 14px", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
               <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, letterSpacing: "0.02em" }}>
                 SECTION 3: SCANNER MODIFIER CHEAT CODES
