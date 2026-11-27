@@ -1612,7 +1612,7 @@ export function InventorySuite({ token, api, userRole, onBack }) {
     <div>
       <div className="row" style={{ marginBottom: "1rem" }}>
         <h2 style={{ margin: 0, color: "var(--blue-primary)" }}>Barcode Inventory & Recipes</h2>
-        <button onClick={onBack}>Back to POS</button>
+        {userRole !== "manager" && <button onClick={onBack}>Back to POS</button>}
       </div>
 
       <div className="nav-tabs">

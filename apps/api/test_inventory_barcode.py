@@ -7,7 +7,8 @@ client = TestClient(app)
 
 def get_headers(role="owner"):
     emp_id = "1001" if role == "owner" else ("1002" if role == "manager" else "1003")
-    r = client.post("/auth/login", json={"tenant": "crown", "emp_id": emp_id, "password": "admin123"})
+    pw = "258000" if role == "owner" else ("456456" if role == "manager" else "admin123")
+    r = client.post("/auth/login", json={"tenant": "crown", "emp_id": emp_id, "password": pw})
     assert r.status_code == 200
     return {"Authorization": f"Bearer {r.json()['token']}"}
 

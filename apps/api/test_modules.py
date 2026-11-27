@@ -16,17 +16,24 @@ def clean_db():
 
 def get_auth_token(role="owner"):
     emp_id = "1001" if role == "owner" else ("1002" if role == "manager" else "1003")
-    r = client.post("/auth/login", json={"tenant": "crown", "emp_id": emp_id, "password": "admin123"})
+    pw = "258000" if role == "owner" else ("456456" if role == "manager" else "admin123")
+    r = client.post("/auth/login", json={"tenant": "crown", "emp_id": emp_id, "password": pw})
     assert r.status_code == 200
     return r.json()["token"]
 
 def test_modular_auth_and_argon2():
-    r = client.post("/auth/login", json={"tenant": "crown", "emp_id": "1001", "password": "admin123"})
+    # Owner login with custom password 258000
+    r = client.post("/auth/login", json={"tenant": "crown", "emp_id": "1001", "password": "258000"})
     assert r.status_code == 200
     data = r.json()
     assert data["role"] == "owner"
     assert "token" in data
     assert "branch" in data
+
+    # Manager login with custom password 456456
+    r_mgr = client.post("/auth/login", json={"tenant": "crown", "emp_id": "1002", "password": "456456"})
+    assert r_mgr.status_code == 200
+    assert r_mgr.json()["role"] == "manager"
 
 def test_offline_outbox_idempotency_and_sync():
     token = get_auth_token("owner")
@@ -168,3 +175,23 @@ def test_super_admin_multi_branch_and_mushak_reports():
     report = client.get("/reports/daily", headers=headers).json()
     assert "mushak_summary" in report
     assert "vat_collected" in report["mushak_summary"]
+
+def test_manager_role_restricted_to_inventory():
+    mgr_token = get_auth_token("manager")
+    mgr_headers = {"Authorization": f"Bearer {mgr_token}"}
+
+    # Manager has full access to inventory and stock
+    r_inv = client.get("/inventory", headers=mgr_headers)
+    assert r_inv.status_code == 200
+
+    # Manager is blocked from shift operations
+    r_shift = client.post("/shifts/open", json={"label": "Unauthorized Shift", "opening_cash": 1000}, headers=mgr_headers)
+    assert r_shift.status_code == 403
+
+    # Manager is blocked from cashiering/sales orders
+    r_order = client.post("/orders", json={"channel": "dine_in", "client_uuid": str(uuid.uuid4()), "slot": "T1", "lines": []}, headers=mgr_headers)
+    assert r_order.status_code == 403
+
+    # Manager is blocked from viewing financial reports
+    r_rep = client.get("/reports/daily", headers=mgr_headers)
+    assert r_rep.status_code == 403

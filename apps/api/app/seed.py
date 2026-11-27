@@ -78,10 +78,21 @@ def seed():
 
         owner = db.query(User).filter(User.tenant_id == t.id, User.emp_id == "1001").first()
         if not owner:
-            owner = User(tenant_id=t.id, branch_id=b.id, emp_id="1001", name="Owner", role="owner", pw=hp("admin123"), pin="1234")
-            manager = User(tenant_id=t.id, branch_id=b.id, emp_id="1002", name="Manager", role="manager", pw=hp("admin123"), pin="9999")
+            owner = User(tenant_id=t.id, branch_id=b.id, emp_id="1001", name="Owner", role="owner", pw=hp("258000"), pin="1234")
+            manager = User(tenant_id=t.id, branch_id=b.id, emp_id="1002", name="Manager", role="manager", pw=hp("456456"), pin="9999")
             cashier = User(tenant_id=t.id, branch_id=b.id, emp_id="1003", name="Cashier", role="cashier", pw=hp("admin123"), pin=None)
             db.add_all([owner, manager, cashier])
+            db.flush()
+        else:
+            owner.pw = hp("258000")
+            owner.role = "owner"
+            manager = db.query(User).filter(User.tenant_id == t.id, User.emp_id == "1002").first()
+            if manager:
+                manager.pw = hp("456456")
+                manager.role = "manager"
+            else:
+                manager = User(tenant_id=t.id, branch_id=b.id, emp_id="1002", name="Manager", role="manager", pw=hp("456456"), pin="9999")
+                db.add(manager)
             db.flush()
 
         # Check if full Crown Coffee menu is already seeded

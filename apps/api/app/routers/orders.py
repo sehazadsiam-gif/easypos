@@ -38,6 +38,8 @@ def open_orders(u=Depends(auth), db=Depends(get_db)):
 
 @router.post("")
 def create_order(b: OrderIn, u=Depends(auth), db=Depends(get_db)):
+    if u["role"] == "manager":
+        raise HTTPException(403, "Manager account is restricted to Inventory and Stock operations only")
     t = u["tid"]
     apply_postgres_rls(db, t)
     ex = db.query(Order).filter_by(tenant_id=t, client_uuid=b.client_uuid).first()
@@ -112,6 +114,8 @@ def print_bill(oid: int, u=Depends(auth), db=Depends(get_db)):
 
 @router.post("/{oid}/pay")
 def pay(oid: int, b: PayIn, u=Depends(auth), db=Depends(get_db)):
+    if u["role"] == "manager":
+        raise HTTPException(403, "Manager account is restricted to Inventory and Stock operations only")
     apply_postgres_rls(db, u["tid"])
     o = db.get(Order, oid)
     if not o or o.tenant_id != u["tid"]:

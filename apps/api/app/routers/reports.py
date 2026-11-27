@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from app.dependencies import get_db, auth, apply_postgres_rls
 from app.models import Order, Line, Shift, RecipeItem, Ingredient, VoidRefund
 
@@ -6,6 +6,8 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/daily")
 def daily(u=Depends(auth), db=Depends(get_db)):
+    if u["role"] == "manager":
+        raise HTTPException(403, "Manager account is restricted to Inventory and Stock operations only")
     apply_postgres_rls(db, u["tid"])
     out = {
         "by_shift": {},

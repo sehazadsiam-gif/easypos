@@ -22,6 +22,8 @@ def shift_now(u=Depends(auth), db=Depends(get_db)):
 
 @router.post("/open")
 def shift_open(b: ShiftIn, u=Depends(auth), db=Depends(get_db)):
+    if u["role"] == "manager":
+        raise HTTPException(403, "Manager account is restricted to Inventory and Stock operations only")
     apply_postgres_rls(db, u["tid"])
     if cur(db, u["tid"]):
         raise HTTPException(400, "A shift is already open")
@@ -39,6 +41,8 @@ def shift_open(b: ShiftIn, u=Depends(auth), db=Depends(get_db)):
 
 @router.post("/close")
 def shift_close(b: CloseIn, u=Depends(auth), db=Depends(get_db)):
+    if u["role"] == "manager":
+        raise HTTPException(403, "Manager account is restricted to Inventory and Stock operations only")
     apply_postgres_rls(db, u["tid"])
     s = cur(db, u["tid"])
     if not s:

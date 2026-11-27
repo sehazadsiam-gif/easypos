@@ -53,14 +53,15 @@ const CHANNELS = [
 ];
 
 function Login({ onLogin }) {
-  const [f, setF] = useState({ tenant: "crown", emp_id: "1001", password: "admin123" });
+  const [f, setF] = useState({ tenant: "crown", emp_id: "1001", password: "258000" });
   const [err, setErr] = useState("");
   const [activeRole, setActiveRole] = useState("owner");
   const [loading, setLoading] = useState(false);
 
   const selectRole = (role, empId) => {
     setActiveRole(role);
-    setF({ tenant: "crown", emp_id: empId, password: "admin123" });
+    const pwd = role === "owner" ? "258000" : (role === "manager" ? "456456" : "admin123");
+    setF({ tenant: "crown", emp_id: empId, password: pwd });
     setErr("");
   };
 
@@ -108,6 +109,7 @@ function Login({ onLogin }) {
             >
               <span style={{ fontSize: "1.1rem" }}>👑</span>
               <span>Owner</span>
+              <span style={{ fontSize: "0.62rem", color: "#64748b", fontWeight: 700 }}>All Access</span>
             </button>
             <button
               type="button"
@@ -116,6 +118,7 @@ function Login({ onLogin }) {
             >
               <span style={{ fontSize: "1.1rem" }}>👔</span>
               <span>Manager</span>
+              <span style={{ fontSize: "0.62rem", color: "#64748b", fontWeight: 700 }}>Stock & Inv</span>
             </button>
             <button
               type="button"
@@ -124,6 +127,7 @@ function Login({ onLogin }) {
             >
               <span style={{ fontSize: "1.1rem" }}>💳</span>
               <span>Cashier</span>
+              <span style={{ fontSize: "0.62rem", color: "#64748b", fontWeight: 700 }}>POS Only</span>
             </button>
           </div>
         </div>
@@ -1316,9 +1320,18 @@ export default function App() {
     return () => clearInterval(interval);
   }, [token, view.name]);
 
-  if (!me) return <Login onLogin={setMe} />;
+  const handleLogin = (user) => {
+    setMe(user);
+    if (user.role === "manager") {
+      setView({ name: "inventory" });
+    } else {
+      setView({ name: "home" });
+    }
+  };
 
-  const home = () => setView({ name: "home" });
+  if (!me) return <Login onLogin={handleLogin} />;
+
+  const home = () => setView(me?.role === "manager" ? { name: "inventory" } : { name: "home" });
 
   const openShift = async () => {
     const label = prompt("Shift label (e.g. Morning Shift)", "Shift 1");
@@ -1382,7 +1395,11 @@ export default function App() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", flexWrap: "wrap" }}>
           <span style={{ fontSize: "0.88rem", background: "var(--paper-subtle)", padding: "0.3rem 0.75rem", borderRadius: "8px" }}>
-            {shift ? (
+            {me.role === "manager" ? (
+              <span style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
+                👔 Manager · <small style={{ color: "var(--emerald)", fontWeight: 800 }}>Inventory & Stock Portal</small>
+              </span>
+            ) : shift ? (
               <span style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
                 🟢 {shift.label} <small>({tk(shift.opening_cash)})</small>
               </span>
@@ -1390,16 +1407,18 @@ export default function App() {
               <span style={{ color: "var(--rose)", fontWeight: 600 }}>🔴 Register Closed</span>
             )}
             {" · "}
-            <b>{me.name}</b> <small style={{ color: "var(--ink-muted)" }}>({me.role})</small>
+            <b>{me.name}</b> <small style={{ color: "var(--ink-muted)" }}>({me.role === "owner" ? "👑 Owner · Full Access" : me.role})</small>
           </span>
-          {shift ? (
-            <button className="warn" style={{ minHeight: "36px", padding: "0.35rem 0.95rem" }} onClick={closeShift}>
-              Close Shift
-            </button>
-          ) : (
-            <button className="primary" style={{ minHeight: "36px", padding: "0.35rem 0.95rem" }} onClick={openShift}>
-              Open Shift
-            </button>
+          {me.role !== "manager" && (
+            shift ? (
+              <button className="warn" style={{ minHeight: "36px", padding: "0.35rem 0.95rem" }} onClick={closeShift}>
+                Close Shift
+              </button>
+            ) : (
+              <button className="primary" style={{ minHeight: "36px", padding: "0.35rem 0.95rem" }} onClick={openShift}>
+                Open Shift
+              </button>
+            )
           )}
           <button style={{ minHeight: "36px", padding: "0.35rem 0.95rem", color: "var(--ink-muted)" }} onClick={() => setMe(null)}>
             Log Out
@@ -1436,6 +1455,9 @@ export default function App() {
         )}
 
         {view.name === "home" && (
+          me.role === "manager" ? (
+            <InventorySuite token={token} api={api} userRole={me.role} onBack={home} />
+          ) : (
           <div>
             <div style={{ marginBottom: "1.5rem" }}>
               <h2 style={{ margin: "0 0 0.4rem 0", color: "var(--ink)", letterSpacing: "-0.02em" }}>Welcome, {me.name} 👋</h2>
@@ -1527,7 +1549,7 @@ export default function App() {
               </div>
             )}
           </div>
-        )}
+        ))}
 
         {view.name === "layout" && (
           <div>
