@@ -64,29 +64,38 @@ def create_order(b: OrderIn, u=Depends(auth), db=Depends(get_db)):
     
     svc = round(sub * SVC / 100) if b.channel == "dine_in" else 0
     vat = round(sub * VAT / 100)
-    o = Order(
-        tenant_id=t,
-        branch_id=u.get("branch_id"),
-        shift_id=s.id,
-        client_uuid=b.client_uuid,
-        channel=b.channel,
-        slot=b.slot,
-        waiter=b.waiter,
-        subtotal=sub,
-        vat=vat,
-        service=svc,
-        total=sub + vat + svc
-    )
-    db.add(o)
-    db.flush()
-    for l in lines:
-        l.order_id = o.id
-        db.add(l)
-    
-    generate_print_jobs(db, t, o, lines)
-    deduct_inventory_for_order(db, t, o.id)
-    db.commit()
-    return ser(o, db)
+    try:
+        o = Order(
+            tenant_id=t,
+            branch_id=u.get("branch_id"),
+            shift_id=s.id,
+            client_uuid=b.client_uuid,
+            channel=b.channel,
+            slot=b.slot,
+            waiter=b.waiter,
+            subtotal=sub,
+            vat=vat,
+            service=svc,
+            total=sub + vat + svc
+        )
+        db.add(o)
+        db.flush()
+        for l in lines:
+            l.order_id = o.id
+            db.add(l)
+        db.flush()
+
+        generate_print_jobs(db, t, o, lines)
+        deduct_inventory_for_order(db, t, o.id)
+        db.commit()
+        return ser(o, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging, traceback
+        logging.getLogger("easypos.orders").error(f"Order creation failed: {e}\n{traceback.format_exc()}")
+        db.rollback()
+        raise HTTPException(500, detail=f"Order failed: {str(e)}")
 
 @router.post("/{oid}/transfer")
 def transfer_table(oid: int, b: TableTransferIn, u=Depends(auth), db=Depends(get_db)):

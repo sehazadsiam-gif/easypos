@@ -11,15 +11,15 @@ def deduct_inventory_for_order(db, tenant_id: int, order_id: int):
         for r in recipes:
             ing = db.query(Ingredient).filter_by(tenant_id=tenant_id, id=r.ingredient_id).first()
             if ing:
-                used = r.qty * line.qty
-                ing.current_stock = max(0, ing.current_stock - used)
-                cost = ing.cost_per_unit * used
+                used = (r.qty or 0) * (line.qty or 0)
+                ing.current_stock = max(0, (ing.current_stock or 0) - used)
+                cost = (ing.cost_per_unit or 0) * used
                 db.add(StockMovement(
                     tenant_id=tenant_id,
                     ingredient_id=ing.id,
                     movement_type="sale_deduction",
                     qty_change=-used,
-                    unit=ing.unit,
+                    unit=ing.unit or "g",
                     cost_paisa=cost,
                     ref_order_id=order_id,
                     reason=f"Sale order #{order_id} ({line.qty}x {line.name})"
@@ -29,17 +29,19 @@ def generate_print_jobs(db, tenant_id: int, order: Order, lines: List[Line], rep
     """Generate station KOTs and Bill/Receipt print jobs."""
     stations = {}
     for l in lines:
-        stations.setdefault(l.station, []).append(l)
+        st = (l.station or "kitchen").lower()
+        stations.setdefault(st, []).append(l)
 
     prefix = "[REPRINT] " if reprint else ""
+    ts = (order.created_at or datetime.utcnow()).strftime('%Y-%m-%d %H:%M:%S')
 
-    # 1. Station KOTs
+    # 1. Station KOTs (separates KITCHEN vs BAR automatically)
     for station, s_lines in stations.items():
         text_lines = [
             f"=== {prefix}KOT: {station.upper()} ===",
             f"Order #{order.id} | Slot: {order.slot or '-'} | Ch: {order.channel}",
             f"Waiter: {order.waiter or '-'}",
-            f"Time: {order.created_at.strftime('%Y-%m-%d %H:%M:%S')}",
+            f"Time: {ts}",
             "--------------------------------",
         ]
         for sl in s_lines:
@@ -57,22 +59,27 @@ def generate_print_jobs(db, tenant_id: int, order: Order, lines: List[Line], rep
         db.add(job)
 
     # 2. Bill / Customer Receipt (Mushak 6.3 compliant summary)
+    subtotal = order.subtotal or 0
+    vat = order.vat or 0
+    service = order.service or 0
+    total = order.total or 0
     bill_lines = [
         "*** CROWN POINT OF SALE ***",
         f"Mushak Invoice / Receipt {prefix}",
         f"Order #{order.id} | Slot: {order.slot or '-'}",
-        f"Channel: {order.channel.replace('_', ' ').title()}",
-        f"Date: {order.created_at.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Channel: {(order.channel or 'dine_in').replace('_', ' ').title()}",
+        f"Date: {ts}",
         "--------------------------------",
     ]
     for l in lines:
-        bill_lines.append(f"{l.name:<18} x{l.qty:>2} ৳{(l.unit_price * l.qty)/100:>7.2f}")
+        up = l.unit_price or 0
+        bill_lines.append(f"{l.name:<18} x{l.qty:>2} ৳{(up * l.qty)/100:>7.2f}")
     bill_lines.append("--------------------------------")
-    bill_lines.append(f"Subtotal:          ৳{order.subtotal/100:.2f}")
-    bill_lines.append(f"VAT:               ৳{order.vat/100:.2f}")
-    if order.service > 0:
-        bill_lines.append(f"Service Charge:    ৳{order.service/100:.2f}")
-    bill_lines.append(f"Grand Total:       ৳{order.total/100:.2f}")
+    bill_lines.append(f"Subtotal:          ৳{subtotal/100:.2f}")
+    bill_lines.append(f"VAT:               ৳{vat/100:.2f}")
+    if service > 0:
+        bill_lines.append(f"Service Charge:    ৳{service/100:.2f}")
+    bill_lines.append(f"Grand Total:       ৳{total/100:.2f}")
     bill_lines.append("================================")
     bill_lines.append("Thank you for dining with us!")
 

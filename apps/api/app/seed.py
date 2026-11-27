@@ -28,6 +28,14 @@ def _ensure_columns():
         ("recipe_items", "version", "INTEGER DEFAULT 1"),
         ("stock_ledger", "ref_ledger_id", "INTEGER"),
         ("stock_ledger", "reason", "VARCHAR"),
+        ("orders", "branch_id", "INTEGER"),
+        ("orders", "waiter", "VARCHAR"),
+        ("lines", "station", "VARCHAR DEFAULT 'kitchen'"),
+        ("stock_movements", "ref_order_id", "INTEGER"),
+        ("stock_movements", "ref_trip_id", "INTEGER"),
+        ("stock_movements", "created_by", "INTEGER"),
+        ("print_jobs", "station", "VARCHAR DEFAULT 'kitchen'"),
+        ("print_jobs", "status", "VARCHAR DEFAULT 'pending'"),
     ]
     is_sqlite = str(engine.url).startswith("sqlite")
     for table, col, col_type in migrations:

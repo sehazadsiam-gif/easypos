@@ -25,7 +25,7 @@ const api = async (path, token, body, method) => {
   return d;
 };
 
-const tk = (p) => (p != null && p > 0 ? "৳" + (p / 100).toFixed(2) : "Needs Price");
+const tk = (p) => (p != null ? "৳" + (p / 100).toFixed(2) : "Needs Price");
 
 export function CrownLogo({ size = 34, style = {} }) {
   return (

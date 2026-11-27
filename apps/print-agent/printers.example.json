@@ -1,0 +1,12 @@
+{
+  "api_url": "https://crownpointofsale.online/api",
+  "poll_interval": 3,
+  "tenant": "crown",
+  "emp_id": "1001",
+  "password": "CHANGE_TO_YOUR_PASSWORD",
+  "printers": {
+    "kitchen": "192.168.1.50:9100",
+    "bar": "192.168.1.51:9100",
+    "counter": "192.168.1.52:9100"
+  }
+}
