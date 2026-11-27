@@ -52,7 +52,7 @@ const CHANNELS = [
   ["pathao", "Pathao"]
 ];
 
-function Login({ onLogin }) {
+function Login({ onLogin, onInstall, canInstall }) {
   const [f, setF] = useState({ tenant: "crown", emp_id: "1001", password: "258000" });
   const [err, setErr] = useState("");
   const [activeRole, setActiveRole] = useState("owner");
@@ -212,6 +212,31 @@ function Login({ onLogin }) {
         >
           {loading ? "Authenticating..." : "Sign In to Terminal →"}
         </button>
+
+        {canInstall && (
+          <button
+            type="button"
+            onClick={onInstall}
+            style={{
+              width: "100%",
+              marginTop: "0.85rem",
+              padding: "0.65rem 1rem",
+              borderRadius: "12px",
+              border: "1.5px dashed #4f46e5",
+              background: "#eef2ff",
+              color: "#4338ca",
+              fontWeight: 700,
+              fontSize: "0.84rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+              cursor: "pointer"
+            }}
+          >
+            <span>📲 Install Crown POS Desktop / Tablet App</span>
+          </button>
+        )}
 
         <div className="auth-footer">
           <span>🔒 256-Bit Bank-Grade Encryption</span>
@@ -1274,8 +1299,27 @@ export default function App() {
   const [voidRefundTarget, setVoidRefundTarget] = useState(null);
   const [transferTarget, setTransferTarget] = useState(null);
   const [tablesLayout, setTablesLayout] = useState([]);
+  const [installPrompt, setInstallPrompt] = useState(null);
 
   const token = me?.token;
+
+  useEffect(() => {
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+  }, []);
+
+  const installPwa = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") {
+      setInstallPrompt(null);
+    }
+  };
 
   const refresh = async () => {
     if (!token) return;
@@ -1329,7 +1373,7 @@ export default function App() {
     }
   };
 
-  if (!me) return <Login onLogin={handleLogin} />;
+  if (!me) return <Login onLogin={handleLogin} onInstall={installPwa} canInstall={!!installPrompt} />;
 
   const home = () => setView(me?.role === "manager" ? { name: "inventory" } : { name: "home" });
 
@@ -1387,6 +1431,27 @@ export default function App() {
           {outboxCount > 0 && (
             <button className="secondary" onClick={triggerSync} style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", minHeight: "32px", animation: "pulseLive 2s infinite" }}>
               ⚡ Sync Outbox ({outboxCount})
+            </button>
+          )}
+          {installPrompt && (
+            <button
+              onClick={installPwa}
+              style={{
+                padding: "0.25rem 0.75rem",
+                fontSize: "0.8rem",
+                minHeight: "32px",
+                background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "8px",
+                boxShadow: "0 2px 6px rgba(5, 150, 105, 0.35)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                fontWeight: 700
+              }}
+            >
+              📲 Install App
             </button>
           )}
           <button className="secondary" onClick={() => setView({ name: "barcode_catalog" })} style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", minHeight: "32px", background: "var(--brand-light)", color: "var(--brand-primary)", border: "1.5px solid var(--brand-primary)" }}>
