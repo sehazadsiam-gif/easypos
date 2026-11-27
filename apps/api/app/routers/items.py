@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
-from app.dependencies import get_db, auth, apply_postgres_rls
+from app.dependencies import get_db, auth, apply_postgres_rls, verify_owner_password
 from app.models import Item, Recipe, RecipeItem
 from app.schemas import ItemIn, ItemUpdateIn
 from app.services.inventory_service import validate_barcode, get_approved_recipe
@@ -101,6 +101,9 @@ def update_item(item_id: int, b: ItemUpdateIn, u=Depends(auth), db=Depends(get_d
     it = db.query(Item).filter_by(tenant_id=u["tid"], id=item_id).first()
     if not it:
         raise HTTPException(404, "Item not found")
+
+    if get_approved_recipe(db, u["tid"], it.id):
+        verify_owner_password(db, u["tid"], b.owner_password)
 
     # If price is explicitly passed (including 0 or None to reset)
     if b.price is not None:

@@ -1,6 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from app.dependencies import get_db, auth, apply_postgres_rls
+from app.dependencies import get_db, auth, apply_postgres_rls, verify_owner_password
 from app.models import Ingredient, RecipeItem, Item, DailyBazar, StockMovement, BazarTrip, StockLedger, User
 from app.schemas import IngredientIn, RecipeSetIn, DailyBazarIn, WastageIn, BazarTripIn, LedgerReversalIn
 from app.services.inventory_service import get_inventory_summary, validate_barcode, today_str
@@ -132,6 +132,7 @@ def reverse_ledger_entry(ledger_id: int, b: LedgerReversalIn, u=Depends(auth), d
     if not b.reason or not b.reason.strip():
         raise HTTPException(400, "Reversal reason is required")
     apply_postgres_rls(db, u["tid"])
+    verify_owner_password(db, u["tid"], b.owner_password)
 
     orig = db.get(StockLedger, ledger_id)
     if not orig or orig.tenant_id != u["tid"]:

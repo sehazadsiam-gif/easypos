@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { PrintableBarcodeSheet, BarcodeSvg } from "./BarcodeSheet";
-import { IconAlert, IconClose, IconCheck, IconEdit, IconPlus, IconPrinter, IconSearch, IconArrowLeft } from "./Icons";
+import { IconAlert, IconClose, IconCheck, IconEdit, IconPlus, IconPrinter, IconSearch, IconArrowLeft, IconLock } from "./Icons";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -32,6 +32,103 @@ export const formatBazarName = (name, unit = "g") => {
 
 const tk = (p) => (p != null && p > 0 ? "৳" + (p / 100).toFixed(2) : "Needs Price");
 
+function OwnerPasswordModal({ title, description, requireReason = false, onClose, onConfirm }) {
+  const [password, setPassword] = useState("");
+  const [reason, setReason] = useState("");
+  const [err, setErr] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const submit = async () => {
+    if (requireReason && !reason.trim()) {
+      setErr("Please enter a reason.");
+      return;
+    }
+    if (!password.trim()) {
+      setErr("Owner password is required.");
+      return;
+    }
+    setSubmitting(true);
+    setErr("");
+    try {
+      await onConfirm(password.trim(), reason.trim());
+    } catch (e) {
+      setErr(e.message || "Authorization failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="confirm-modal-icon" style={{ background: "var(--brand-light)", color: "var(--brand-primary)" }}>
+          <IconLock size={22} />
+        </div>
+        <h3 style={{ margin: "0 0 0.35rem", fontSize: "1.15rem", fontWeight: 800, color: "var(--ink)", letterSpacing: "-0.02em" }}>
+          {title || "Owner Authorization Required"}
+        </h3>
+        <p style={{ margin: "0 0 1.1rem", color: "var(--ink-muted)", fontSize: "0.88rem", lineHeight: 1.5 }}>
+          {description || "Editing an approved record requires the Owner password."}
+        </p>
+
+        {requireReason && (
+          <div style={{ marginBottom: "0.85rem" }}>
+            <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "0.3rem", textTransform: "uppercase" }}>
+              Reason *
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Wrong scan count or quantity correction"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              style={{ width: "100%" }}
+              autoFocus
+            />
+          </div>
+        )}
+
+        <div style={{ marginBottom: "0.85rem" }}>
+          <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "0.3rem", textTransform: "uppercase" }}>
+            Owner Password *
+          </label>
+          <input
+            type="password"
+            placeholder="Enter Owner Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            style={{ width: "100%" }}
+            autoFocus={!requireReason}
+          />
+        </div>
+
+        {err && (
+          <div style={{ background: "var(--rose-light)", border: "1px solid var(--rose-border)", color: "var(--rose)", padding: "0.55rem 0.75rem", borderRadius: "8px", fontSize: "0.84rem", fontWeight: 700, marginBottom: "0.85rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <IconAlert size={15} color="var(--rose)" />
+            <span>{err}</span>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "0.65rem", justifyContent: "flex-end" }}>
+          <button onClick={onClose} disabled={submitting} style={{ minHeight: "40px", padding: "0.5rem 1.1rem" }}>
+            Cancel
+          </button>
+          <button className="primary" onClick={submit} disabled={submitting} style={{ minHeight: "40px", padding: "0.5rem 1.25rem", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+            <IconLock size={14} />
+            <span>{submitting ? "Verifying..." : "Authorize & Save"}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
   const isManager = userRole === "owner" || userRole === "manager";
   const isSale = batchType === "sale";
@@ -46,6 +143,8 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
   const [allowNegative, setAllowNegative] = useState(false);
   const [scanInput, setScanInput] = useState("");
   const [msg, setMsg] = useState({ text: "", type: "info" });
+  const [editApprovedMode, setEditApprovedMode] = useState(false);
+  const [showOwnerAuth, setShowOwnerAuth] = useState(false);
   const scanRef = useRef(null);
 
   const refocusScan = () => {
@@ -97,7 +196,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
     return created;
   };
 
-  const syncLinesToServer = async (batchObj, nextLines, negFlag = allowNegative) => {
+  const syncLinesToServer = async (batchObj, nextLines, negFlag = allowNegative, ownerPassword = null) => {
     const payload = {
       batch_date: hasDate ? batchDate : batchObj.batch_date,
       allow_negative_stock: negFlag,
@@ -106,11 +205,13 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
           ? { menu_item_id: l.menu_item_id, quantity: l.quantity }
           : { bazar_item_id: l.bazar_item_id, quantity: l.quantity, pack_count: l.pack_count || 1 }
       ),
+      ...(ownerPassword ? { owner_password: ownerPassword } : {}),
     };
     const updated = await api(`/batches/${batchObj.id}/lines`, token, payload, "PUT");
     setActiveBatch(updated);
     setLines(updated.lines || []);
     loadData();
+    onChanged?.();
     return updated;
   };
 
@@ -121,6 +222,8 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
       setBatchDate(b.batch_date || todayISO());
       setLines(b.lines || []);
       setAllowNegative(Boolean(b.allow_negative_stock));
+      setEditApprovedMode(false);
+      setShowOwnerAuth(false);
       setMsg({ text: `Loaded ${b.status.toUpperCase()} batch #${b.id}`, type: "info" });
       refocusScan();
     } catch (e) {
@@ -132,6 +235,8 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
     setActiveBatch(null);
     setLines([]);
     setAllowNegative(false);
+    setEditApprovedMode(false);
+    setShowOwnerAuth(false);
     setBatchDate(todayISO());
     setMsg({ text: "Started new draft batch. Ready to scan.", type: "info" });
     refocusScan();
@@ -144,8 +249,8 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
       refocusScan();
       return;
     }
-    if (activeBatch && activeBatch.status === "approved") {
-      setMsg({ text: "Approved batch is locked. Start a new draft to scan.", type: "error" });
+    if (activeBatch && activeBatch.status === "approved" && !editApprovedMode) {
+      setMsg({ text: "Approved batch is locked. Click 'Edit Approved Batch' (Owner Password required) or start a new draft.", type: "error" });
       refocusScan();
       return;
     }
@@ -196,12 +301,17 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
       }
 
       next[next.length - 1] = last;
-      try {
-        const batchObj = await ensureDraftBatch();
-        await syncLinesToServer(batchObj, next);
-        setMsg({ text: `Applied ${code} to ${last.name}`, type: "info" });
-      } catch (e) {
-        setMsg({ text: e.message, type: "error" });
+      if (editApprovedMode) {
+        setLines(next);
+        setMsg({ text: `Applied ${code} to ${last.name} (unsaved — click Save Approved Changes)`, type: "info" });
+      } else {
+        try {
+          const batchObj = await ensureDraftBatch();
+          await syncLinesToServer(batchObj, next);
+          setMsg({ text: `Applied ${code} to ${last.name}`, type: "info" });
+        } catch (e) {
+          setMsg({ text: e.message, type: "error" });
+        }
       }
       refocusScan();
       return;
@@ -228,12 +338,17 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
       } else {
         next.push({ menu_item_id: matched.id, name: matched.name, barcode: matched.barcode, quantity: 1 });
       }
-      try {
-        const batchObj = await ensureDraftBatch();
-        await syncLinesToServer(batchObj, next);
-        setMsg({ text: `Scanned: ${matched.name} (+1 serving)`, type: "info" });
-      } catch (e) {
-        setMsg({ text: e.message, type: "error" });
+      if (editApprovedMode) {
+        setLines(next);
+        setMsg({ text: `Scanned: ${matched.name} (+1 serving — unsaved)`, type: "info" });
+      } else {
+        try {
+          const batchObj = await ensureDraftBatch();
+          await syncLinesToServer(batchObj, next);
+          setMsg({ text: `Scanned: ${matched.name} (+1 serving)`, type: "info" });
+        } catch (e) {
+          setMsg({ text: e.message, type: "error" });
+        }
       }
     } else {
       const matched = bazarItems.find((i) => i.barcode && i.barcode.toUpperCase() === code);
@@ -263,10 +378,35 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
           pack_count: 1,
         });
       }
+      if (editApprovedMode) {
+        setLines(next);
+        setMsg({ text: `Scanned: ${matched.name} (+${formatQty(packSize, matched.base_unit)} — unsaved)`, type: "info" });
+      } else {
+        try {
+          const batchObj = await ensureDraftBatch();
+          await syncLinesToServer(batchObj, next);
+          setMsg({ text: `Scanned: ${matched.name} (+${formatQty(packSize, matched.base_unit)})`, type: "info" });
+        } catch (e) {
+          setMsg({ text: e.message, type: "error" });
+        }
+      }
+    }
+    refocusScan();
+  };
+
+  const adjustLine = async (idx, delta) => {
+    if (activeBatch?.status === "approved" && !editApprovedMode) return;
+    const next = [...lines];
+    const step = isSale ? 1 : (next[idx].pack_size || 1);
+    const newQty = next[idx].quantity + delta * step;
+    if (newQty <= 0) return;
+    next[idx] = { ...next[idx], quantity: newQty };
+    if (editApprovedMode) {
+      setLines(next);
+    } else {
       try {
         const batchObj = await ensureDraftBatch();
         await syncLinesToServer(batchObj, next);
-        setMsg({ text: `Scanned: ${matched.name} (+${formatQty(packSize, matched.base_unit)})`, type: "info" });
       } catch (e) {
         setMsg({ text: e.message, type: "error" });
       }
@@ -274,45 +414,48 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
     refocusScan();
   };
 
-  const adjustLine = async (idx, delta) => {
-    if (activeBatch?.status === "approved") return;
-    const next = [...lines];
-    const step = isSale ? 1 : (next[idx].pack_size || 1);
-    const newQty = next[idx].quantity + delta * step;
-    if (newQty <= 0) return;
-    next[idx] = { ...next[idx], quantity: newQty };
-    try {
-      const batchObj = await ensureDraftBatch();
-      await syncLinesToServer(batchObj, next);
-    } catch (e) {
-      setMsg({ text: e.message, type: "error" });
-    }
-    refocusScan();
-  };
-
   const setManualQty = async (idx, valStr) => {
-    if (activeBatch?.status === "approved") return;
+    if (activeBatch?.status === "approved" && !editApprovedMode) return;
     const val = parseInt(valStr, 10);
     if (!val || val <= 0) return;
     const next = [...lines];
     next[idx] = { ...next[idx], quantity: val };
-    try {
-      const batchObj = await ensureDraftBatch();
-      await syncLinesToServer(batchObj, next);
-    } catch (e) {
-      setMsg({ text: e.message, type: "error" });
+    if (editApprovedMode) {
+      setLines(next);
+    } else {
+      try {
+        const batchObj = await ensureDraftBatch();
+        await syncLinesToServer(batchObj, next);
+      } catch (e) {
+        setMsg({ text: e.message, type: "error" });
+      }
     }
   };
 
   const removeLine = async (idx) => {
-    if (activeBatch?.status === "approved") return;
+    if (activeBatch?.status === "approved" && !editApprovedMode) return;
     const next = lines.filter((_, i) => i !== idx);
-    try {
-      const batchObj = await ensureDraftBatch();
-      await syncLinesToServer(batchObj, next);
-    } catch (e) {
-      setMsg({ text: e.message, type: "error" });
+    if (editApprovedMode) {
+      setLines(next);
+    } else {
+      try {
+        const batchObj = await ensureDraftBatch();
+        await syncLinesToServer(batchObj, next);
+      } catch (e) {
+        setMsg({ text: e.message, type: "error" });
+      }
     }
+    refocusScan();
+  };
+
+  const saveApprovedChanges = async (ownerPassword) => {
+    if (!activeBatch || lines.length === 0) {
+      throw new Error("Approved batch must have at least one line.");
+    }
+    await syncLinesToServer(activeBatch, lines, allowNegative, ownerPassword);
+    setEditApprovedMode(false);
+    setShowOwnerAuth(false);
+    setMsg({ text: `Approved Batch #${activeBatch.id} updated with Owner authorization (ledger reconciled).`, type: "info" });
     refocusScan();
   };
 
@@ -341,7 +484,8 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
     refocusScan();
   };
 
-  const isLocked = activeBatch?.status === "approved";
+  const isApproved = activeBatch?.status === "approved";
+  const isLocked = isApproved && !editApprovedMode;
   const warnings = activeBatch?.stock_warnings || [];
 
   return (
@@ -581,25 +725,78 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
             </div>
           )}
 
-          <div style={{ marginTop: "1.2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: "var(--gray)", fontSize: "0.85rem" }}>
-              {isLocked
-                ? `Approved by ${activeBatch.approved_by || "Manager"}`
-                : isManager
-                ? "Ready for Manager/Owner approval"
-                : "Draft saved · Only Manager/Owner can approve"}
+          <div style={{ marginTop: "1.2rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
+            <span style={{ color: "var(--gray)", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+              {isApproved && !editApprovedMode ? (
+                <>
+                  <IconLock size={14} color="var(--brand-primary)" />
+                  <span>Approved by {activeBatch.approved_by || "Manager"} · Owner password required to edit</span>
+                </>
+              ) : editApprovedMode ? (
+                <span style={{ color: "#b45309", fontWeight: 700 }}>
+                  Editing Approved Batch #{activeBatch.id} — Owner password required to save
+                </span>
+              ) : isManager ? (
+                "Ready for Manager/Owner approval"
+              ) : (
+                "Draft saved · Only Manager/Owner can approve"
+              )}
             </span>
-            {!isLocked && (
-              <button
-                className="primary"
-                disabled={!isManager || lines.length === 0}
-                style={{ minHeight: "48px", padding: "0 2rem", fontSize: "1.05rem", opacity: !isManager || lines.length === 0 ? 0.5 : 1 }}
-                onClick={approveBatch}
-              >
-                APPROVE
-              </button>
-            )}
+            <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
+              {isApproved && !editApprovedMode && (
+                <button
+                  className="secondary"
+                  style={{ minHeight: "42px", padding: "0 1.25rem", display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
+                  onClick={() => {
+                    setEditApprovedMode(true);
+                    setMsg({ text: "Edit mode unlocked locally. Make changes and click Save Approved Changes with Owner Password.", type: "info" });
+                    refocusScan();
+                  }}
+                >
+                  <IconLock size={14} />
+                  <span>Edit Approved Batch</span>
+                </button>
+              )}
+              {editApprovedMode && (
+                <>
+                  <button
+                    style={{ minHeight: "42px", padding: "0 1.1rem" }}
+                    onClick={() => openBatch(activeBatch.id)}
+                  >
+                    Cancel Edit
+                  </button>
+                  <button
+                    className="primary"
+                    disabled={lines.length === 0}
+                    style={{ minHeight: "42px", padding: "0 1.4rem", display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
+                    onClick={() => setShowOwnerAuth(true)}
+                  >
+                    <IconLock size={14} />
+                    <span>Save Approved Changes</span>
+                  </button>
+                </>
+              )}
+              {!isApproved && (
+                <button
+                  className="primary"
+                  disabled={!isManager || lines.length === 0}
+                  style={{ minHeight: "48px", padding: "0 2rem", fontSize: "1.05rem", opacity: !isManager || lines.length === 0 ? 0.5 : 1 }}
+                  onClick={approveBatch}
+                >
+                  APPROVE
+                </button>
+              )}
+            </div>
           </div>
+
+          {showOwnerAuth && (
+            <OwnerPasswordModal
+              title="Authorize Approved Batch Edit"
+              description={`Enter the Owner password to save edits to approved ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} Batch #${activeBatch?.id}. Stock ledger entries will be reconciled automatically.`}
+              onClose={() => setShowOwnerAuth(false)}
+              onConfirm={saveApprovedChanges}
+            />
+          )}
         </div>
       </div>
 
@@ -661,6 +858,7 @@ function RecipesView({ token, api, userRole }) {
   const [createdMenuItem, setCreatedMenuItem] = useState(null);
   const [showQuickBazarModal, setShowQuickBazarModal] = useState(false);
   const [quickBazar, setQuickBazar] = useState({ name: "", unit: "g", pack_size: "100", min_stock: "100" });
+  const [recipeAuthAction, setRecipeAuthAction] = useState(null); // "draft" | "approve" | null
   const [msg, setMsg] = useState("");
 
   const load = async () => {
@@ -791,31 +989,52 @@ function RecipesView({ token, api, userRole }) {
     setDraftLines([...draftLines, { bazar_item_id: first.id, amount: 1, unit: first.base_unit }]);
   };
 
+  const executeSaveDraft = async (ownerPassword = null) => {
+    if (!selectedId) return;
+    await api(`/recipes/${selectedId}/draft`, token, {
+      ingredients: draftLines.map((l) => ({
+        bazar_item_id: parseInt(l.bazar_item_id, 10),
+        amount: parseFloat(l.amount),
+        unit: l.unit,
+      })),
+      ...(ownerPassword ? { owner_password: ownerPassword } : {}),
+    });
+    setRecipeAuthAction(null);
+    setMsg("Draft recipe saved! (Old approved version stays active until approved)");
+    await load();
+    selectItem(selectedId);
+  };
+
   const saveDraft = async () => {
     if (!selectedId) return;
+    if (detail?.approved_recipe) {
+      setRecipeAuthAction("draft");
+      return;
+    }
     try {
-      await api(`/recipes/${selectedId}/draft`, token, {
-        ingredients: draftLines.map((l) => ({
-          bazar_item_id: parseInt(l.bazar_item_id, 10),
-          amount: parseFloat(l.amount),
-          unit: l.unit,
-        })),
-      });
-      setMsg("Draft recipe saved! (Old approved version stays active until approved)");
-      await load();
-      selectItem(selectedId);
+      await executeSaveDraft();
     } catch (e) {
       setMsg(e.message);
     }
   };
 
+  const executeApproveRecipe = async (ownerPassword = null) => {
+    if (!selectedId) return;
+    await api(`/recipes/${selectedId}/approve`, token, ownerPassword ? { owner_password: ownerPassword } : {});
+    setRecipeAuthAction(null);
+    setMsg("Recipe approved and active on Menu & Daily Sale!");
+    await load();
+    selectItem(selectedId);
+  };
+
   const approveRecipe = async () => {
     if (!selectedId) return;
+    if (detail?.approved_recipe) {
+      setRecipeAuthAction("approve");
+      return;
+    }
     try {
-      await api(`/recipes/${selectedId}/approve`, token, {});
-      setMsg("Recipe approved and active on Menu & Daily Sale!");
-      await load();
-      selectItem(selectedId);
+      await executeApproveRecipe();
     } catch (e) {
       setMsg(e.message);
     }
@@ -1165,6 +1384,15 @@ function RecipesView({ token, api, userRole }) {
           </div>
         </div>
       )}
+
+      {recipeAuthAction && (
+        <OwnerPasswordModal
+          title={recipeAuthAction === "approve" ? "Authorize Approved Recipe Update" : "Authorize Edit to Approved Recipe"}
+          description={`"${detail?.name}" already has an approved recipe. Enter the Owner password to ${recipeAuthAction === "approve" ? "approve the new recipe version" : "save changes to this approved recipe"}.`}
+          onClose={() => setRecipeAuthAction(null)}
+          onConfirm={(pwd) => (recipeAuthAction === "approve" ? executeApproveRecipe(pwd) : executeSaveDraft(pwd))}
+        />
+      )}
     </div>
   );
 }
@@ -1177,6 +1405,7 @@ function MenuApprovedView({ token, api, userRole }) {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
+  const [pendingPriceSave, setPendingPriceSave] = useState(null); // { item_id, name, pricePaisa }
 
   const loadItems = () => {
     api("/items", token).then(setItems).catch(() => {});
@@ -1192,6 +1421,23 @@ function MenuApprovedView({ token, api, userRole }) {
     setEditPrice(m.price ? (m.price / 100).toString() : "");
   };
 
+  const commitPriceUpdate = async (item_id, pricePaisa, ownerPassword = null) => {
+    setSaving(true);
+    try {
+      await api(
+        `/items/${item_id}`,
+        token,
+        { price: pricePaisa, ...(ownerPassword ? { owner_password: ownerPassword } : {}) },
+        "PATCH"
+      );
+      setEditingItemId(null);
+      setPendingPriceSave(null);
+      loadItems();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSavePrice = async (item_id, e) => {
     e.stopPropagation();
     const parsed = parseFloat(editPrice);
@@ -1199,19 +1445,16 @@ function MenuApprovedView({ token, api, userRole }) {
       alert("Please enter a valid selling price in Taka (e.g. 399)");
       return;
     }
-    setSaving(true);
+    const pricePaisa = parsed > 0 ? Math.round(parsed * 100) : 0;
+    const targetItem = items.find((i) => i.id === item_id);
+    if (targetItem && targetItem.recipe_status === "approved") {
+      setPendingPriceSave({ item_id, name: targetItem.name, pricePaisa });
+      return;
+    }
     try {
-      const pricePaisa = parsed > 0 ? Math.round(parsed * 100) : 0;
-      await api(`/items/${item_id}`, token, {
-        method: "PATCH",
-        body: { price: pricePaisa }
-      });
-      setEditingItemId(null);
-      loadItems();
+      await commitPriceUpdate(item_id, pricePaisa);
     } catch (err) {
       alert("Failed to update price: " + (err.message || err));
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -1361,6 +1604,15 @@ function MenuApprovedView({ token, api, userRole }) {
           );
         })}
       </div>
+
+      {pendingPriceSave && (
+        <OwnerPasswordModal
+          title="Authorize Approved Menu Edit"
+          description={`"${pendingPriceSave.name}" is an approved menu item. Enter the Owner password to update its selling price.`}
+          onClose={() => setPendingPriceSave(null)}
+          onConfirm={(pwd) => commitPriceUpdate(pendingPriceSave.item_id, pendingPriceSave.pricePaisa, pwd)}
+        />
+      )}
     </div>
   );
 }
@@ -1376,6 +1628,7 @@ function InventoryOverviewView({ token, api, userRole }) {
   const [newBazar, setNewBazar] = useState({ name: "", barcode: "", unit: "g", pack_size: "100", min_stock: "100" });
   const [lastCreatedBazar, setLastCreatedBazar] = useState(null);
   const [msg, setMsg] = useState("");
+  const [reverseTargetId, setReverseTargetId] = useState(null);
 
   const load = async () => {
     try {
@@ -1420,16 +1673,19 @@ function InventoryOverviewView({ token, api, userRole }) {
     }
   };
 
-  const reverseEntry = async (entryId) => {
-    const reason = window.prompt("Enter reason for reversal:");
-    if (!reason || !reason.trim()) return;
-    try {
-      await api(`/inventory/ledger/${entryId}/reverse`, token, { reason: reason.trim() });
-      setMsg("Reversal entry recorded in ledger.");
-      load();
-    } catch (e) {
-      setMsg(e.message);
-    }
+  const reverseEntry = (entryId) => {
+    setReverseTargetId(entryId);
+  };
+
+  const confirmReverseEntry = async (ownerPassword, reason) => {
+    if (!reverseTargetId) return;
+    await api(`/inventory/ledger/${reverseTargetId}/reverse`, token, {
+      reason,
+      owner_password: ownerPassword,
+    });
+    setReverseTargetId(null);
+    setMsg("Reversal entry recorded in ledger with Owner authorization.");
+    load();
   };
 
   const lowItems = summary.filter((i) => i.status === "LOW");
@@ -1437,6 +1693,16 @@ function InventoryOverviewView({ token, api, userRole }) {
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
       {msg && <p className="card" style={{ background: "var(--blue-light)", color: "var(--blue-primary)", fontWeight: 600, margin: 0 }}>{msg}</p>}
+
+      {reverseTargetId && (
+        <OwnerPasswordModal
+          title="Authorize Ledger Reversal"
+          description="Reversing an approved stock ledger entry requires a reason and the Owner password."
+          requireReason={true}
+          onClose={() => setReverseTargetId(null)}
+          onConfirm={confirmReverseEntry}
+        />
+      )}
 
       <div className="card">
         <div className="row" style={{ flexWrap: "wrap", marginBottom: "0.75rem" }}>

@@ -49,11 +49,33 @@ def test_central_and_bazar_approve_adds_stock_and_locks_batch():
     assert r_app.status_code == 200
     assert r_app.json()["status"] == "approved"
 
-    # Approved batch cannot be edited or deleted
-    r_edit = client.put(f"/batches/{cb_id}/lines", json={
+    # Approved batch cannot be edited without owner password (or with wrong password)
+    r_edit_no_pw = client.put(f"/batches/{cb_id}/lines", json={
         "lines": [{"bazar_item_id": ing_id, "quantity": 9999, "pack_count": 10}]
     }, headers=owner_h)
-    assert r_edit.status_code == 400
+    assert r_edit_no_pw.status_code == 403
+
+    r_edit_bad_pw = client.put(f"/batches/{cb_id}/lines", json={
+        "lines": [{"bazar_item_id": ing_id, "quantity": 9999, "pack_count": 10}],
+        "owner_password": "wrongpassword",
+    }, headers=owner_h)
+    assert r_edit_bad_pw.status_code == 403
+
+    # With valid owner password, approved central stock batch CAN be edited and reconciles ledger
+    r_edit_ok = client.put(f"/batches/{cb_id}/lines", json={
+        "lines": [{"bazar_item_id": ing_id, "quantity": 2500, "pack_count": 2.5}],
+        "owner_password": "258000",
+    }, headers=owner_h)
+    assert r_edit_ok.status_code == 200
+    assert r_edit_ok.json()["status"] == "approved"
+
+    # Re-edit back to 2000 so downstream stock total assertions remain 2000 + 4000 = 6000
+    r_edit_back = client.put(f"/batches/{cb_id}/lines", json={
+        "lines": [{"bazar_item_id": ing_id, "quantity": 2000, "pack_count": 2}],
+        "owner_password": "258000",
+    }, headers=owner_h)
+    assert r_edit_back.status_code == 200
+
     r_del = client.delete(f"/batches/{cb_id}", headers=owner_h)
     assert r_del.status_code == 400
 
@@ -66,6 +88,15 @@ def test_central_and_bazar_approve_adds_stock_and_locks_batch():
     }, headers=staff_h)
     r_bapp = client.post(f"/batches/{bb_id}/approve", json={}, headers=owner_h)
     assert r_bapp.status_code == 200
+
+    # Approved Daily Bazar batch cannot be edited without owner password, succeeds with owner password
+    assert client.put(f"/batches/{bb_id}/lines", json={
+        "lines": [{"bazar_item_id": ing_id, "quantity": 4500, "pack_count": 4.5}]
+    }, headers=owner_h).status_code == 403
+    assert client.put(f"/batches/{bb_id}/lines", json={
+        "lines": [{"bazar_item_id": ing_id, "quantity": 4000, "pack_count": 4}],
+        "owner_password": "258000",
+    }, headers=owner_h).status_code == 200
 
     # Check inventory summary: Central (2000) + Bazar (4000) = 6000
     inv = client.get("/inventory", headers=owner_h).json()
@@ -141,13 +172,27 @@ def test_unit_conversion_and_recipe_approval_workflow():
     approved_menu3 = client.get("/items?approved_only=true", headers=staff_h).json()
     assert any(m["id"] == menu_id for m in approved_menu3)
 
-    # Editing approved recipe creates draft v2 while v1 stays active
-    r_draft2 = client.post(f"/recipes/{menu_id}/draft", json={
+    # Approved menu item cannot be edited without owner password
+    assert client.patch(f"/items/{menu_id}", json={"price": 45000}, headers=owner_h).status_code == 403
+    assert client.patch(f"/items/{menu_id}", json={"price": 45000, "owner_password": "wrong"}, headers=owner_h).status_code == 403
+    assert client.patch(f"/items/{menu_id}", json={"price": 45000, "owner_password": "258000"}, headers=owner_h).status_code == 200
+
+    # Editing approved recipe requires owner password
+    r_draft2_fail = client.post(f"/recipes/{menu_id}/draft", json={
         "ingredients": [{"bazar_item_id": ing_g, "amount": 500, "unit": "g"}]
+    }, headers=staff_h)
+    assert r_draft2_fail.status_code == 403
+
+    r_draft2 = client.post(f"/recipes/{menu_id}/draft", json={
+        "ingredients": [{"bazar_item_id": ing_g, "amount": 500, "unit": "g"}],
+        "owner_password": "258000",
     }, headers=staff_h)
     assert r_draft2.status_code == 200
     assert r_draft2.json()["version"] == 2
     assert r_draft2.json()["status"] == "draft"
+
+    # Approving an update over an already-approved recipe also requires owner password
+    assert client.post(f"/recipes/{menu_id}/approve", json={}, headers=owner_h).status_code == 403
 
     rec_info = client.get(f"/recipes/{menu_id}", headers=owner_h).json()
     assert rec_info["approved_recipe"]["version"] == 1
@@ -180,6 +225,11 @@ def test_sale_deduction_negative_stock_and_reversal():
     assert r_sl.json()["lines"][0]["recipe_version"] == 1
     assert client.post(f"/batches/{sb_id}/approve", json={}, headers=owner_h).status_code == 200
 
+    # Approved Daily Sale batch cannot be edited without owner password, succeeds with owner password
+    assert client.put(f"/batches/{sb_id}/lines", json={"lines": [{"menu_item_id": menu_id, "quantity": 2}]}, headers=owner_h).status_code == 403
+    r_sale_edit = client.put(f"/batches/{sb_id}/lines", json={"lines": [{"menu_item_id": menu_id, "quantity": 3}], "owner_password": "258000"}, headers=owner_h)
+    assert r_sale_edit.status_code == 200
+
     inv = client.get("/inventory", headers=owner_h).json()
     item = next(x for x in inv if x["id"] == ing_id)
     assert item["current_stock"] == 40
@@ -197,10 +247,11 @@ def test_sale_deduction_negative_stock_and_reversal():
     r_ok = client.post(f"/batches/{sb2_id}/approve", json={"allow_negative_stock": True}, headers=owner_h)
     assert r_ok.status_code == 200
 
-    # Reverse the second sale ledger entry -> restores +100g back to 40g
+    # Reverse the second sale ledger entry requires owner password -> restores +100g back to 40g
     ledger = client.get(f"/inventory/ledger?bazar_item_id={ing_id}&type=sale", headers=owner_h).json()
     sale2_entry = next(e for e in ledger if e["batch_id"] == sb2_id)
-    r_rev = client.post(f"/inventory/ledger/{sale2_entry['id']}/reverse", json={"reason": "Wrong scan count"}, headers=owner_h)
+    assert client.post(f"/inventory/ledger/{sale2_entry['id']}/reverse", json={"reason": "Wrong scan count"}, headers=owner_h).status_code == 403
+    r_rev = client.post(f"/inventory/ledger/{sale2_entry['id']}/reverse", json={"reason": "Wrong scan count", "owner_password": "258000"}, headers=owner_h)
     assert r_rev.status_code == 200
     assert r_rev.json()["quantity"] == 100
 

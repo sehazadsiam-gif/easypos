@@ -21,6 +21,7 @@ class ItemUpdateIn(BaseModel):
     category: Optional[str] = None
     station: Optional[str] = None
     image_url: Optional[str] = None
+    owner_password: Optional[str] = None
 
 class ShiftIn(BaseModel):
     label: str = "Shift 1"
@@ -156,6 +157,11 @@ class RecipeLineIn(BaseModel):
 
 class RecipeDraftIn(BaseModel):
     ingredients: List[RecipeLineIn]
+    owner_password: Optional[str] = None
+
+
+class RecipeApproveIn(BaseModel):
+    owner_password: Optional[str] = None
 
 
 class BatchCreateIn(BaseModel):
@@ -176,6 +182,7 @@ class BatchLinesUpdateIn(BaseModel):
     batch_date: Optional[str] = None
     note: Optional[str] = None
     allow_negative_stock: Optional[bool] = None
+    owner_password: Optional[str] = None
 
 
 class BatchApproveIn(BaseModel):
@@ -184,3 +191,4 @@ class BatchApproveIn(BaseModel):
 
 class LedgerReversalIn(BaseModel):
     reason: str
+    owner_password: Optional[str] = None

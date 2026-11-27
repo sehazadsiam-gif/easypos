@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Body
 from app.database import now
-from app.dependencies import get_db, auth, apply_postgres_rls
+from app.dependencies import get_db, auth, apply_postgres_rls, verify_owner_password
 from app.models import Item, Ingredient, Recipe, RecipeItem, User
-from app.schemas import RecipeDraftIn
+from app.schemas import RecipeDraftIn, RecipeApproveIn
 from app.services.inventory_service import convert_to_base_units, get_approved_recipe
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
@@ -105,6 +106,8 @@ def save_recipe_draft(item_id: int, b: RecipeDraftIn, u=Depends(auth), db=Depend
     it = db.get(Item, item_id)
     if not it or it.tenant_id != u["tid"]:
         raise HTTPException(404, "Menu item not found")
+    if get_approved_recipe(db, u["tid"], item_id):
+        verify_owner_password(db, u["tid"], b.owner_password)
     if not b.ingredients:
         raise HTTPException(400, "Recipe must have at least one ingredient")
 
@@ -162,7 +165,7 @@ def save_recipe_draft(item_id: int, b: RecipeDraftIn, u=Depends(auth), db=Depend
 
 
 @router.post("/{item_id}/approve")
-def approve_recipe(item_id: int, u=Depends(auth), db=Depends(get_db)):
+def approve_recipe(item_id: int, b: Optional[RecipeApproveIn] = Body(default=None), u=Depends(auth), db=Depends(get_db)):
     """Manager/owner only: approve the latest draft recipe for a menu item."""
     if u["role"] not in ("owner", "manager"):
         raise HTTPException(403, "Only manager or owner can approve recipes")
@@ -171,6 +174,9 @@ def approve_recipe(item_id: int, u=Depends(auth), db=Depends(get_db)):
     it = db.get(Item, item_id)
     if not it or it.tenant_id != u["tid"]:
         raise HTTPException(404, "Menu item not found")
+
+    if get_approved_recipe(db, u["tid"], item_id):
+        verify_owner_password(db, u["tid"], b.owner_password if b else None)
 
     draft = (
         db.query(Recipe)

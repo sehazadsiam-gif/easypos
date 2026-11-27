@@ -85,21 +85,23 @@ def get_inventory_summary(
     ings = db.query(Ingredient).filter_by(tenant_id=tenant_id).order_by(Ingredient.name.asc()).all()
     current_map = get_current_stock_map(db, tenant_id)
 
-    ledger_q = db.query(
-        StockLedger.bazar_item_id,
-        StockLedger.type,
-        func.coalesce(func.sum(StockLedger.quantity), 0),
-    ).filter(StockLedger.tenant_id == tenant_id)
-
+    ledger_q = db.query(StockLedger).filter(StockLedger.tenant_id == tenant_id)
     if start_date:
         ledger_q = ledger_q.filter(StockLedger.date >= start_date)
     if end_date:
         ledger_q = ledger_q.filter(StockLedger.date <= end_date)
 
-    rows = ledger_q.group_by(StockLedger.bazar_item_id, StockLedger.type).all()
+    all_entries = ledger_q.all()
+    reversed_ids = {e.ref_ledger_id for e in all_entries if e.type == "reversal" and e.ref_ledger_id}
+
     by_type: Dict[int, Dict[str, int]] = {}
-    for item_id, ltype, total in rows:
-        by_type.setdefault(item_id, {})[ltype] = int(total or 0)
+    for e in all_entries:
+        if e.type == "reversal":
+            by_type.setdefault(e.bazar_item_id, {})["reversal"] = by_type.get(e.bazar_item_id, {}).get("reversal", 0) + int(e.quantity or 0)
+            continue
+        if e.id in reversed_ids:
+            continue
+        by_type.setdefault(e.bazar_item_id, {})[e.type] = by_type.get(e.bazar_item_id, {}).get(e.type, 0) + int(e.quantity or 0)
 
     result = []
     for ing in ings:

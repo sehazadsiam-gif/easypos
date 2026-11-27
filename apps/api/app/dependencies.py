@@ -28,6 +28,18 @@ def require_role(roles: list):
         return u
     return check
 
+def verify_owner_password(db, tenant_id: int, owner_password: str = None):
+    """Verify that the provided password matches an owner account in this tenant."""
+    if not owner_password or not str(owner_password).strip():
+        raise HTTPException(403, "Owner password is required to edit an approved record")
+    from app.models import User
+    from app.security import vp
+    owners = db.query(User).filter_by(tenant_id=tenant_id, role="owner").all()
+    for owner in owners:
+        if vp(str(owner_password).strip(), owner.pw):
+            return owner
+    raise HTTPException(403, "Invalid owner password")
+
 def apply_postgres_rls(db, tenant_id: int):
     """
     Enforces row level security parameter in PostgreSQL session if active.

@@ -1,7 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.database import now
-from app.dependencies import get_db, auth, apply_postgres_rls
+from app.dependencies import get_db, auth, apply_postgres_rls, verify_owner_password
 from app.models import (
     Ingredient,
     Item,
@@ -158,8 +158,13 @@ def update_batch_lines(batch_id: int, b: BatchLinesUpdateIn, u=Depends(auth), db
     batch = db.get(InventoryBatch, batch_id)
     if not batch or batch.tenant_id != u["tid"]:
         raise HTTPException(404, "Batch not found")
-    if batch.status != "draft":
-        raise HTTPException(400, "Approved batches cannot be edited")
+
+    is_approved_edit = batch.status != "draft"
+    verified_owner = None
+    if is_approved_edit:
+        verified_owner = verify_owner_password(db, u["tid"], b.owner_password)
+        if not b.lines:
+            raise HTTPException(400, "Approved batch must have at least one line")
 
     if b.batch_date is not None:
         batch.batch_date = b.batch_date
@@ -204,6 +209,88 @@ def update_batch_lines(batch_id: int, b: BatchLinesUpdateIn, u=Depends(auth), db
                 quantity=ln.quantity,
                 pack_count=float(ln.quantity),
             ))
+
+    if is_approved_edit:
+        # Append-only ledger reconciliation: reverse active entries for this batch, then post updated entries
+        existing_entries = (
+            db.query(StockLedger)
+            .filter_by(tenant_id=u["tid"], batch_id=batch.id)
+            .all()
+        )
+        reversed_ids = {e.ref_ledger_id for e in existing_entries if e.type == "reversal" and e.ref_ledger_id}
+        for orig in existing_entries:
+            if orig.type == "reversal" or orig.id in reversed_ids:
+                continue
+            rev = StockLedger(
+                tenant_id=u["tid"],
+                bazar_item_id=orig.bazar_item_id,
+                quantity=-orig.quantity,
+                type="reversal",
+                batch_id=batch.id,
+                ref_ledger_id=orig.id,
+                date=today_str(),
+                reason=f"Owner Edit Reversal for {batch.batch_type.title()} Batch #{batch.id}",
+                created_by=verified_owner.id,
+            )
+            db.add(rev)
+            ing = db.get(Ingredient, orig.bazar_item_id)
+            if ing:
+                ing.current_stock = (ing.current_stock or 0) + rev.quantity
+        db.flush()
+
+        # Re-post ledger entries for the edited lines
+        if batch.batch_type in ("central", "bazar"):
+            for nl in new_lines:
+                ing = db.get(Ingredient, nl.bazar_item_id)
+                db.add(StockLedger(
+                    tenant_id=u["tid"],
+                    bazar_item_id=nl.bazar_item_id,
+                    quantity=nl.quantity,
+                    type=batch.batch_type,
+                    batch_id=batch.id,
+                    date=batch.batch_date,
+                    reason=f"Owner Edited {batch.batch_type.title()} Batch #{batch.id}",
+                    created_by=verified_owner.id,
+                ))
+                if ing:
+                    ing.current_stock = (ing.current_stock or 0) + nl.quantity
+        else:
+            stock_map = get_current_stock_map(db, u["tid"])
+            deductions = {}
+            for nl in new_lines:
+                rec_items = db.query(RecipeItem).filter_by(tenant_id=u["tid"], recipe_id=nl.recipe_id).all()
+                if not rec_items:
+                    it = db.get(Item, nl.menu_item_id)
+                    raise HTTPException(400, f"Recipe has no ingredients for {it.name if it else nl.menu_item_id}")
+                for ri in rec_items:
+                    deductions[ri.ingredient_id] = deductions.get(ri.ingredient_id, 0) + (ri.qty * nl.quantity)
+
+            allow_neg = bool(batch.allow_negative_stock)
+            if not allow_neg:
+                for ing_id, deduct_qty in deductions.items():
+                    avail = stock_map.get(ing_id, 0)
+                    if avail - deduct_qty < 0:
+                        ing = db.get(Ingredient, ing_id)
+                        name = ing.name if ing else f"Item {ing_id}"
+                        raise HTTPException(400, f"Not enough stock for {name} (available {avail}, needed {deduct_qty})")
+
+            for ing_id, deduct_qty in deductions.items():
+                ing = db.get(Ingredient, ing_id)
+                db.add(StockLedger(
+                    tenant_id=u["tid"],
+                    bazar_item_id=ing_id,
+                    quantity=-deduct_qty,
+                    type="sale",
+                    batch_id=batch.id,
+                    date=batch.batch_date,
+                    reason=f"Owner Edited Daily Sale Batch #{batch.id}",
+                    created_by=verified_owner.id,
+                ))
+                if ing:
+                    ing.current_stock = (ing.current_stock or 0) - deduct_qty
+
+        batch.approved_by = verified_owner.id
+        batch.approved_at = now()
 
     db.query(InventoryBatchLine).filter_by(tenant_id=u["tid"], batch_id=batch.id).delete()
     for nl in new_lines:
