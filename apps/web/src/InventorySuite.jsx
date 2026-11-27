@@ -361,30 +361,44 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <input
-              ref={scanRef}
-              autoFocus
-              disabled={isLocked}
-              placeholder={
-                isSale
-                  ? "Scan MENU barcode (e.g. MENU-CAPPUCCINO) or QTY-X5..."
-                  : "Scan BAZAR barcode (e.g. ING-MILK-1L) or QTY-X5..."
-              }
-              style={{
-                flex: 1,
-                fontSize: "1.1rem",
-                padding: "0.8rem",
-                border: "2px solid var(--blue-primary)",
-                borderRadius: "8px",
-              }}
-              value={scanInput}
-              onChange={(e) => setScanInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleScan(scanInput)}
-            />
-            <button className="primary" style={{ minHeight: "48px", padding: "0 1.4rem" }} disabled={isLocked} onClick={() => handleScan(scanInput)}>
-              Scan
-            </button>
+          <div className="scanner-container" style={{ margin: "0.8rem 0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                🔴 Hardware Laser Scanner Active (Auto-Focused)
+              </span>
+              <span style={{ fontSize: "0.75rem", background: "#334155", color: "#f8fafc", padding: "2px 8px", borderRadius: "4px" }}>
+                CODE-128
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <input
+                ref={scanRef}
+                autoFocus
+                disabled={isLocked}
+                placeholder={
+                  isSale
+                    ? "Scan or type MENU barcode (e.g. MENU-JAPANESE-TOR) or QTY-X5..."
+                    : "Scan or type BAZAR barcode (e.g. ING-CHICKEN-THI-G) or QTY-X5..."
+                }
+                style={{
+                  flex: 1,
+                  fontSize: "1.1rem",
+                  padding: "0.85rem 1rem",
+                  borderRadius: "8px",
+                }}
+                value={scanInput}
+                onChange={(e) => setScanInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleScan(scanInput)}
+              />
+              <button
+                className="primary"
+                style={{ minHeight: "48px", padding: "0 1.5rem", fontWeight: 700 }}
+                disabled={isLocked}
+                onClick={() => handleScan(scanInput)}
+              >
+                Scan Barcode
+              </button>
+            </div>
           </div>
 
           <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center" }}>

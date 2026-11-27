@@ -278,6 +278,7 @@ function VoidRefundModal({ order, token, onClose, onSuccess }) {
 function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
   const [items, setItems] = useState([]);
   const [category, setCategory] = useState("All");
+  const [search, setSearch] = useState("");
   const [cart, setCart] = useState({});
   const [waiter, setWaiter] = useState("");
   const [err, setErr] = useState("");
@@ -287,14 +288,22 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
   }, [token]);
 
   const categories = ["All", ...new Set(items.map(i => i.category || "General"))];
-  const filteredItems = category === "All" ? items : items.filter(i => (i.category || "General") === category);
+  const filteredItems = items.filter(i => {
+    const matchesCat = category === "All" || (i.category || "General") === category;
+    const matchesSearch = !search.trim() || 
+      i.name.toLowerCase().includes(search.toLowerCase()) || 
+      (i.barcode && i.barcode.toLowerCase().includes(search.toLowerCase()));
+    return matchesCat && matchesSearch;
+  });
 
-  const sub = items.reduce((s, i) => s + i.price * (cart[i.id] || 0), 0);
+  const cartTotalItems = Object.values(cart).reduce((a, b) => a + b, 0);
+  const sub = items.reduce((s, i) => s + (i.price || 0) * (cart[i.id] || 0), 0);
   const vat = Math.round((sub * cfg.vat) / 100);
   const svc = channel === "dine_in" ? Math.round((sub * cfg.service) / 100) : 0;
   const total = sub + vat + svc;
 
   const add = (id, d) => setCart((c) => ({ ...c, [id]: Math.max(0, (c[id] || 0) + d) }));
+  const clearCart = () => setCart({});
 
   const submit = async (payNow) => {
     const lines = Object.entries(cart)
@@ -336,77 +345,180 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
   return (
     <div className="order">
       <div>
-        <div className="nav-tabs">
-          {categories.map(c => (
-            <button key={c} className={category === c ? "active" : ""} onClick={() => setCategory(c)}>
-              {c}
-            </button>
-          ))}
+        {/* Search Bar & Categories */}
+        <div style={{ display: "flex", gap: "0.8rem", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap" }}>
+          <div style={{ position: "relative", flex: 1, minWidth: "220px" }}>
+            <input
+              placeholder="🔍 Search dishes (e.g. Tori, Sushi, Croissant, Wings...)"
+              style={{ width: "100%", paddingLeft: "2.4rem", borderRadius: "999px", background: "#ffffff" }}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", minHeight: "26px", padding: "0 8px", border: "none", background: "transparent", color: "var(--ink-muted)", cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <div style={{ fontSize: "0.85rem", color: "var(--ink-muted)", fontWeight: 600 }}>
+            Showing <b>{filteredItems.length}</b> of {items.length} items
+          </div>
         </div>
 
+        {/* Category Pills */}
+        <div className="nav-tabs" style={{ marginBottom: "1.2rem" }}>
+          {categories.map(c => {
+            const count = c === "All" ? items.length : items.filter(i => (i.category || "General") === c).length;
+            return (
+              <button key={c} className={category === c ? "active" : ""} onClick={() => setCategory(c)}>
+                {c} <span style={{ opacity: 0.65, fontSize: "0.78rem" }}>({count})</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Menu Items Grid */}
         <div className="grid">
-          {filteredItems.map((i) => (
-            <button key={i.id} className="tile" onClick={() => add(i.id, 1)}>
-              <div>
-                <span style={{ fontSize: "0.95rem" }}>{i.name}</span>
-                <div style={{ fontSize: "0.75rem", color: "var(--gray)", marginTop: "2px" }}>
-                  <span style={{ background: "var(--blue-light)", color: "var(--blue-primary)", padding: "1px 5px", borderRadius: "4px" }}>
-                    {i.station}
-                  </span>
+          {filteredItems.map((i) => {
+            const inCartQty = cart[i.id] || 0;
+            return (
+              <button
+                key={i.id}
+                className="tile"
+                onClick={() => add(i.id, 1)}
+                style={{
+                  border: inCartQty > 0 ? "2px solid var(--brand-primary)" : "1.5px solid var(--line)",
+                  background: inCartQty > 0 ? "var(--brand-light)" : "#ffffff",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
+                  <span style={{ fontSize: "0.95rem", fontWeight: 700, lineHeight: 1.3 }}>{i.name}</span>
+                  {inCartQty > 0 && (
+                    <span style={{
+                      background: "var(--brand-primary)",
+                      color: "#fff",
+                      fontSize: "0.78rem",
+                      fontWeight: 800,
+                      borderRadius: "999px",
+                      padding: "2px 8px",
+                      boxShadow: "0 2px 6px rgba(79, 70, 229, 0.4)",
+                      animation: "popIn 0.2s ease-out"
+                    }}>
+                      +{inCartQty}
+                    </span>
+                  )}
                 </div>
-              </div>
-              <b style={{ color: "var(--blue-primary)", fontSize: "1.05rem" }}>{tk(i.price)}</b>
-            </button>
-          ))}
+
+                <div style={{ width: "100%", marginTop: "0.6rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{
+                      background: "#f1f5f9",
+                      color: "var(--ink-muted)",
+                      fontSize: "0.72rem",
+                      fontWeight: 600,
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      textTransform: "uppercase"
+                    }}>
+                      {i.station || "kitchen"}
+                    </span>
+                    <b style={{ color: "var(--brand-primary)", fontSize: "1.1rem" }}>{tk(i.price)}</b>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="card">
-        <h2 style={{ margin: "0 0 0.8rem 0" }}>{slot || "Order"}</h2>
+      {/* Cart Sidebar */}
+      <div className="card" style={{ display: "flex", flexDirection: "column", height: "fit-content", position: "sticky", top: "80px" }}>
+        <div className="row" style={{ borderBottom: "1.5px solid var(--line)", paddingBottom: "0.75rem", marginBottom: "0.8rem" }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: "1.3rem", color: "var(--brand-primary)" }}>{slot || "Order Ticket"}</h2>
+            <div style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>
+              Channel: <b>{channel === "dine_in" ? "Dine In" : channel}</b> · {cartTotalItems} items
+            </div>
+          </div>
+          {cartTotalItems > 0 && (
+            <button
+              onClick={clearCart}
+              style={{ minHeight: "28px", padding: "0.2rem 0.6rem", fontSize: "0.75rem", color: "var(--rose)", borderColor: "var(--rose-border)" }}
+            >
+              Clear Cart
+            </button>
+          )}
+        </div>
+
         {channel === "dine_in" && (
           <p style={{ margin: "0 0 0.8rem 0" }}>
             <input
-              placeholder="Waiter / Server Name"
+              placeholder="👤 Waiter / Server Name *"
               value={waiter}
               onChange={(e) => setWaiter(e.target.value)}
-              style={{ width: "100%", padding: "0.6rem" }}
+              style={{ width: "100%", padding: "0.6rem 0.9rem", fontWeight: 500 }}
             />
           </p>
         )}
 
-        <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-          {items
-            .filter((i) => cart[i.id])
-            .map((i) => (
-              <div className="row" key={i.id} style={{ marginBottom: "0.5rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.4rem" }}>
-                <div>
-                  <b>{i.name}</b>
-                  <div style={{ fontSize: "0.8rem", color: "var(--gray)" }}>{tk(i.price)} each</div>
+        <div style={{ maxHeight: "320px", overflowY: "auto", paddingRight: "4px" }}>
+          {cartTotalItems === 0 ? (
+            <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-muted)" }}>
+              <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🍽️</div>
+              <b>Your ticket is empty</b>
+              <p style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>Tap any dish on the left to add it to the ticket</p>
+            </div>
+          ) : (
+            items
+              .filter((i) => cart[i.id])
+              .map((i) => (
+                <div className="row" key={i.id} style={{ marginBottom: "0.6rem", borderBottom: "1px solid var(--line)", paddingBottom: "0.5rem" }}>
+                  <div style={{ flex: 1, paddingRight: "0.5rem" }}>
+                    <b style={{ fontSize: "0.92rem" }}>{i.name}</b>
+                    <div style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>
+                      {tk(i.price)} × {cart[i.id]} = <b>{tk((i.price || 0) * cart[i.id])}</b>
+                    </div>
+                  </div>
+                  <div className="row" style={{ gap: "0.35rem" }}>
+                    <button style={{ minHeight: "32px", width: "32px", padding: 0, borderRadius: "50%", fontWeight: 800 }} onClick={() => add(i.id, -1)}>−</button>
+                    <span style={{ fontWeight: 800, minWidth: "24px", textAlign: "center", fontSize: "0.95rem" }}>{cart[i.id]}</span>
+                    <button style={{ minHeight: "32px", width: "32px", padding: 0, borderRadius: "50%", fontWeight: 800 }} onClick={() => add(i.id, 1)}>+</button>
+                  </div>
                 </div>
-                <div className="row" style={{ gap: "0.3rem" }}>
-                  <button style={{ minHeight: "32px", padding: "0.2rem 0.6rem" }} onClick={() => add(i.id, -1)}>−</button>
-                  <span style={{ fontWeight: "bold", minWidth: "20px", textAlign: "center" }}>{cart[i.id]}</span>
-                  <button style={{ minHeight: "32px", padding: "0.2rem 0.6rem" }} onClick={() => add(i.id, 1)}>+</button>
-                </div>
-              </div>
-            ))}
+              ))
+          )}
         </div>
 
         <div className="sum">
-          <div className="row"><span>Subtotal</span><span>{tk(sub)}</span></div>
-          <div className="row"><span>VAT ({cfg.vat}%)</span><span>{tk(vat)}</span></div>
-          {svc > 0 && <div className="row"><span>Service Charge ({cfg.service}%)</span><span>{tk(svc)}</span></div>}
-          <div className="row" style={{ fontSize: "1.15rem", fontWeight: "bold", color: "var(--blue-primary)", marginTop: "0.5rem" }}>
-            <span>Total</span><span>{tk(total)}</span>
+          <div className="row" style={{ marginBottom: "0.35rem", color: "var(--ink-muted)" }}>
+            <span>Subtotal</span>
+            <span style={{ fontWeight: 600, color: "var(--ink)" }}>{tk(sub)}</span>
+          </div>
+          <div className="row" style={{ marginBottom: "0.35rem", color: "var(--ink-muted)" }}>
+            <span>Mushak VAT ({cfg.vat}%)</span>
+            <span style={{ fontWeight: 600, color: "var(--ink)" }}>{tk(vat)}</span>
+          </div>
+          {svc > 0 && (
+            <div className="row" style={{ marginBottom: "0.35rem", color: "var(--ink-muted)" }}>
+              <span>Service Charge ({cfg.service}%)</span>
+              <span style={{ fontWeight: 600, color: "var(--ink)" }}>{tk(svc)}</span>
+            </div>
+          )}
+          <div className="row" style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--brand-primary)", marginTop: "0.75rem", borderTop: "1.5px solid var(--line)", paddingTop: "0.6rem" }}>
+            <span>Grand Total</span>
+            <span>{tk(total)}</span>
           </div>
         </div>
 
-        {err && <p style={{ color: "var(--red)", fontWeight: 600 }}>{err}</p>}
+        {err && <p style={{ color: "var(--rose)", fontWeight: 700, margin: "0.6rem 0", fontSize: "0.88rem" }}>⚠️ {err}</p>}
 
-        <div className="row" style={{ marginTop: "1.2rem" }}>
-          <button onClick={onDone}>Cancel</button>
-          <button className="secondary" onClick={() => submit(false)}>Send to KOT</button>
-          <button className="primary" onClick={() => submit(true)}>Pay Now</button>
+        <div className="row" style={{ marginTop: "1.25rem", gap: "0.6rem" }}>
+          <button onClick={onDone} style={{ flex: 1 }}>Back</button>
+          <button className="secondary" onClick={() => submit(false)} style={{ flex: 1.2 }}>🖨 KOT</button>
+          <button className="primary" onClick={() => submit(true)} style={{ flex: 1.5, fontWeight: 700 }}>💳 Pay Now</button>
         </div>
       </div>
     </div>
@@ -927,32 +1039,59 @@ export default function App() {
   return (
     <>
       <header>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <span className="brand-badge">👑 crownpointofsale</span>
-          <span style={{ fontSize: "0.85rem", color: "var(--gray)", fontWeight: 500 }}>({me.branch || "Uttara"})</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+          <span className="brand-badge" onClick={home} style={{ cursor: "pointer" }}>👑 Crown Coffee POS</span>
+          <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)", fontWeight: 600, background: "var(--paper-subtle)", padding: "3px 8px", borderRadius: "999px" }}>
+            📍 {me.branch || "Uttara"}
+          </span>
           <span className={`status-badge ${isOnline ? "online" : "offline"}`}>
-            {isOnline ? "● Online" : "○ Offline"}
+            <span className="live-dot" style={{ background: isOnline ? "var(--emerald)" : "var(--rose)" }}></span>
+            {isOnline ? "Online" : "Offline Outbox"}
           </span>
           {outboxCount > 0 && (
-            <button className="secondary" onClick={triggerSync} style={{ padding: "0.2rem 0.6rem", fontSize: "0.8rem", minHeight: "30px" }}>
-              Sync Outbox ({outboxCount})
+            <button className="secondary" onClick={triggerSync} style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", minHeight: "32px", animation: "pulseLive 2s infinite" }}>
+              ⚡ Sync Outbox ({outboxCount})
             </button>
           )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <button className="secondary" style={{ minHeight: "36px", padding: "0.3rem 0.8rem", fontWeight: 700 }} onClick={() => setView({ name: "practice_bazar" })}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", flexWrap: "wrap" }}>
+          <button className="secondary" style={{ minHeight: "36px", padding: "0.35rem 0.95rem", fontWeight: 700 }} onClick={() => setView({ name: "practice_bazar" })}>
             🛒 Practice Sandbox
           </button>
-          <span style={{ fontSize: "0.88rem" }}>
-            {shift ? <span style={{ color: "var(--blue-primary)", fontWeight: 600 }}>{shift.label} ({tk(shift.opening_cash)})</span> : "No shift open"} · {me.name} ({me.role})
+          <span style={{ fontSize: "0.88rem", background: "var(--paper-subtle)", padding: "0.3rem 0.75rem", borderRadius: "8px" }}>
+            {shift ? (
+              <span style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
+                🟢 {shift.label} <small>({tk(shift.opening_cash)})</small>
+              </span>
+            ) : (
+              <span style={{ color: "var(--rose)", fontWeight: 600 }}>🔴 Register Closed</span>
+            )}
+            {" · "}
+            <b>{me.name}</b> <small style={{ color: "var(--ink-muted)" }}>({me.role})</small>
           </span>
-          {shift ? <button className="warn" style={{ minHeight: "36px", padding: "0.3rem 0.8rem" }} onClick={closeShift}>Close Shift</button> : <button className="primary" style={{ minHeight: "36px", padding: "0.3rem 0.8rem" }} onClick={openShift}>Open Shift</button>}
-          <button style={{ minHeight: "36px", padding: "0.3rem 0.8rem" }} onClick={() => setMe(null)}>Log Out</button>
+          {shift ? (
+            <button className="warn" style={{ minHeight: "36px", padding: "0.35rem 0.95rem" }} onClick={closeShift}>
+              Close Shift
+            </button>
+          ) : (
+            <button className="primary" style={{ minHeight: "36px", padding: "0.35rem 0.95rem" }} onClick={openShift}>
+              Open Shift
+            </button>
+          )}
+          <button style={{ minHeight: "36px", padding: "0.35rem 0.95rem", color: "var(--ink-muted)" }} onClick={() => setMe(null)}>
+            Log Out
+          </button>
         </div>
       </header>
 
       <main>
-        {msg && <p className="card" style={{ background: "var(--blue-light)", color: "var(--blue-primary)", fontWeight: 600 }} onClick={() => setMsg("")}>{msg}</p>}
+        {msg && (
+          <div className="toast-msg" onClick={() => setMsg("")} style={{ cursor: "pointer" }}>
+            <span>🔔</span>
+            <div style={{ flex: 1 }}>{msg}</div>
+            <small style={{ opacity: 0.7 }}>✕</small>
+          </div>
+        )}
 
         {voidRefundTarget && (
           <VoidRefundModal
@@ -975,24 +1114,59 @@ export default function App() {
 
         {view.name === "home" && (
           <div>
-            <div className="grid">
-              {CHANNELS.map(([k, n]) => (
-                <button className="tile" key={k} onClick={() => setView({ name: "layout", channel: k })}>
-                  <span style={{ fontSize: "1.05rem", color: "var(--blue-primary)" }}>{n}</span>
-                  <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Open orders</span>
-                </button>
-              ))}
-              <button className="tile" onClick={() => setView({ name: "inventory" })}>
-                <span style={{ fontSize: "1.05rem", color: "var(--blue-primary)" }}>Inventory & Stock</span>
-                <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Bazar & Wastage</span>
+            <div style={{ marginBottom: "1.5rem" }}>
+              <h2 style={{ margin: "0 0 0.4rem 0", color: "var(--ink)", letterSpacing: "-0.02em" }}>Welcome, {me.name} 👋</h2>
+              <p style={{ margin: 0, color: "var(--ink-muted)", fontSize: "0.92rem" }}>
+                Select a sales channel or open the barcode-driven inventory manager below.
+              </p>
+            </div>
+
+            <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "1.25rem" }}>
+              {CHANNELS.map(([k, n]) => {
+                const count = open.filter(o => o.channel === k).length;
+                const icons = { dine_in: "🍽️", takeaway: "🛍️", delivery: "🛵" };
+                return (
+                  <button className="tile" key={k} onClick={() => setView({ name: "layout", channel: k })} style={{ minHeight: "125px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                      <span style={{ fontSize: "1.8rem" }}>{icons[k] || "🏷️"}</span>
+                      {count > 0 && (
+                        <span style={{ background: "var(--gold-light)", color: "#92400e", fontWeight: 800, fontSize: "0.78rem", padding: "2px 8px", borderRadius: "999px" }}>
+                          {count} Open
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>{n}</div>
+                      <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>
+                        {count > 0 ? `${count} active orders pending` : "Start new order ticket"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+
+              <button className="tile" onClick={() => setView({ name: "inventory" })} style={{ minHeight: "125px" }}>
+                <span style={{ fontSize: "1.8rem" }}>📦</span>
+                <div>
+                  <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>Inventory & Stock</div>
+                  <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Daily Bazar, Central & Ledger</span>
+                </div>
               </button>
-              <button className="tile" onClick={() => setView({ name: "table_editor" })}>
-                <span style={{ fontSize: "1.05rem", color: "var(--blue-primary)" }}>Floor Plan</span>
-                <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Table Editor</span>
+
+              <button className="tile" onClick={() => setView({ name: "table_editor" })} style={{ minHeight: "125px" }}>
+                <span style={{ fontSize: "1.8rem" }}>🗺️</span>
+                <div>
+                  <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>Floor Plan</div>
+                  <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Interactive Table Layout</span>
+                </div>
               </button>
-              <button className="tile" onClick={report}>
-                <span style={{ fontSize: "1.05rem", color: "var(--blue-primary)" }}>Reports</span>
-                <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Mushak 6.3 & Cost %</span>
+
+              <button className="tile" onClick={report} style={{ minHeight: "125px" }}>
+                <span style={{ fontSize: "1.8rem" }}>📊</span>
+                <div>
+                  <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>Reports</div>
+                  <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Mushak 6.3 & Cost Tracking</span>
+                </div>
               </button>
             </div>
 
