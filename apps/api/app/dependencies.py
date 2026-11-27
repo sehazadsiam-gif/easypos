@@ -30,12 +30,17 @@ def require_role(roles: list):
 
 def apply_postgres_rls(db, tenant_id: int):
     """
-    Enforces row level security parameter in PostgreSQL session.
-    In Postgres: SET LOCAL app.current_tenant_id = 'tenant_id';
+    Enforces row level security parameter in PostgreSQL session if active.
+    Uses set_config(..., false) which is safe both inside and outside transaction blocks.
     """
     try:
-        from sqlalchemy import text
-        tid = int(tenant_id)
-        db.execute(text(f"SET LOCAL app.current_tenant_id = '{tid}';"))
+        bind = getattr(db, "bind", None)
+        if bind and str(bind.url).startswith("postgresql"):
+            from sqlalchemy import text
+            tid = str(int(tenant_id))
+            db.execute(text("SELECT set_config('app.current_tenant_id', :tid, false)"), {"tid": tid})
     except Exception:
-        pass
+        try:
+            db.rollback()
+        except Exception:
+            pass

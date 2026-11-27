@@ -14,8 +14,13 @@ def list_inventory(
     u=Depends(auth),
     db=Depends(get_db),
 ):
-    apply_postgres_rls(db, u["tid"])
-    return get_inventory_summary(db, u["tid"], start_date=start_date, end_date=end_date)
+    try:
+        apply_postgres_rls(db, u["tid"])
+        return get_inventory_summary(db, u["tid"], start_date=start_date, end_date=end_date)
+    except Exception as e:
+        import logging, traceback
+        logging.getLogger("easypos.inventory").error(f"Error in list_inventory: {e}\n{traceback.format_exc()}")
+        raise HTTPException(500, detail=f"Inventory error: {str(e)}")
 
 @router.post("")
 def add_ingredient(b: IngredientIn, u=Depends(auth), db=Depends(get_db)):
@@ -76,37 +81,42 @@ def list_ledger(
     u=Depends(auth),
     db=Depends(get_db),
 ):
-    apply_postgres_rls(db, u["tid"])
-    q = db.query(StockLedger).filter_by(tenant_id=u["tid"])
-    if start_date:
-        q = q.filter(StockLedger.date >= start_date)
-    if end_date:
-        q = q.filter(StockLedger.date <= end_date)
-    if bazar_item_id:
-        q = q.filter(StockLedger.bazar_item_id == bazar_item_id)
-    if type:
-        q = q.filter(StockLedger.type == type)
+    try:
+        apply_postgres_rls(db, u["tid"])
+        q = db.query(StockLedger).filter_by(tenant_id=u["tid"])
+        if start_date:
+            q = q.filter(StockLedger.date >= start_date)
+        if end_date:
+            q = q.filter(StockLedger.date <= end_date)
+        if bazar_item_id:
+            q = q.filter(StockLedger.bazar_item_id == bazar_item_id)
+        if type:
+            q = q.filter(StockLedger.type == type)
 
-    entries = q.order_by(StockLedger.created_at.desc(), StockLedger.id.desc()).limit(300).all()
-    res = []
-    for e in entries:
-        ing = db.get(Ingredient, e.bazar_item_id)
-        usr = db.get(User, e.created_by) if e.created_by else None
-        res.append({
-            "id": e.id,
-            "bazar_item_id": e.bazar_item_id,
-            "bazar_item_name": ing.name if ing else "Unknown",
-            "unit": ing.unit if ing else "",
-            "quantity": e.quantity,
-            "type": e.type,
-            "batch_id": e.batch_id,
-            "ref_ledger_id": e.ref_ledger_id,
-            "date": e.date,
-            "reason": e.reason,
-            "created_by": usr.name if usr else "System",
-            "created_at": e.created_at.isoformat() if e.created_at else None,
-        })
-    return res
+        entries = q.order_by(StockLedger.created_at.desc(), StockLedger.id.desc()).limit(300).all()
+        res = []
+        for e in entries:
+            ing = db.get(Ingredient, e.bazar_item_id)
+            usr = db.get(User, e.created_by) if e.created_by else None
+            res.append({
+                "id": e.id,
+                "bazar_item_id": e.bazar_item_id,
+                "bazar_item_name": ing.name if ing else "Unknown",
+                "unit": ing.unit if ing else "",
+                "quantity": e.quantity,
+                "type": e.type,
+                "batch_id": e.batch_id,
+                "ref_ledger_id": e.ref_ledger_id,
+                "date": e.date,
+                "reason": e.reason,
+                "created_by": usr.name if usr else "System",
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            })
+        return res
+    except Exception as e:
+        import logging, traceback
+        logging.getLogger("easypos.inventory").error(f"Error in list_ledger: {e}\n{traceback.format_exc()}")
+        raise HTTPException(500, detail=f"Ledger error: {str(e)}")
 
 @router.post("/ledger/{ledger_id}/reverse")
 def reverse_ledger_entry(ledger_id: int, b: LedgerReversalIn, u=Depends(auth), db=Depends(get_db)):
