@@ -14,6 +14,10 @@ cors_env = os.getenv("CORS_ORIGINS", "")
 allowed_origins = [
     "https://crownpointofsale.online",
     "http://crownpointofsale.online",
+    "https://www.crownpointofsale.online",
+    "http://www.crownpointofsale.online",
+    "http://localhost",
+    "http://127.0.0.1",
     "http://localhost:3000",
     "http://localhost:5173",
     "http://127.0.0.1:3000",

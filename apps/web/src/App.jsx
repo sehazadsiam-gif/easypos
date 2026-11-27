@@ -13,7 +13,7 @@ const api = async (path, token, body, method) => {
     body: body ? JSON.stringify(body) : undefined,
   });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.detail || "Request failed");
+  if (!r.ok) throw new Error(d.detail || `Request failed (${r.status})`);
   return d;
 };
 

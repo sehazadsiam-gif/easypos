@@ -13,6 +13,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - default
 
   web:
     build:
@@ -21,16 +23,23 @@ services:
     restart: always
     depends_on:
       - api
-    environment:
-      - SERVICE_FQDN_WEB
-    volumes:
-      - webdist:/usr/share/nginx/html
     expose:
       - "80"
+    networks:
+      - default
+      - coolify
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.web.rule=Host(`crownpointofsale.online`)"
+      - "traefik.docker.network=coolify"
+      - "traefik.http.routers.web-http.rule=Host(`crownpointofsale.online`) || Host(`www.crownpointofsale.online`)"
+      - "traefik.http.routers.web-http.entrypoints=http"
+      - "traefik.http.routers.web-https.rule=Host(`crownpointofsale.online`) || Host(`www.crownpointofsale.online`)"
+      - "traefik.http.routers.web-https.entrypoints=https"
+      - "traefik.http.routers.web-https.tls=true"
+      - "traefik.http.routers.web-https.tls.certresolver=letsencrypt"
       - "traefik.http.services.web.loadbalancer.server.port=80"
+      - "traefik.http.routers.web-http.service=web"
+      - "traefik.http.routers.web-https.service=web"
 
   api:
     build:
@@ -45,14 +54,15 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-in-production}
       VAT_PCT: ${VAT_PCT:-5}
       SERVICE_PCT: ${SERVICE_PCT:-10}
-      STATIC_DIR: /app/static
-    volumes:
-      - webdist:/app/static:ro
     expose:
       - "8000"
-    labels:
-      - "traefik.http.services.api.loadbalancer.server.port=8000"
+    networks:
+      - default
 
 volumes:
   pgdata:
-  webdist:
+
+networks:
+  default:
+  coolify:
+    external: true

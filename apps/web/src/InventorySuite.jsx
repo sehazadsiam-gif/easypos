@@ -1373,6 +1373,7 @@ function InventoryOverviewView({ token, api, userRole }) {
       ]);
       setSummary(inv);
       setLedger(led);
+      setMsg("");
     } catch (e) {
       setMsg(e.message);
     }
