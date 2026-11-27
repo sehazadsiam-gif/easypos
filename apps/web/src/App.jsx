@@ -832,7 +832,7 @@ function InventoryDailyBazarView({ token, onBack }) {
             <p>
               <label>Ingredient</label>
               <select style={{ width: "100%" }} value={selectedIng} onChange={e => setSelectedIng(e.target.value)}>
-                {inventory.map(i => <option key={i.id} value={i.id}>{i.name}{(i.unit === 'g' || i.unit === 'gm') && !i.name.toLowerCase().includes('gm') ? ' 100gm' : ''} ({i.unit})</option>)}
+                {inventory.map(i => <option key={i.id} value={i.id}>{i.name}{(i.unit === 'g' || i.unit === 'gm') && !i.name.toLowerCase().includes('gm') ? ' 100gm' : (i.unit === 'ml' && !i.name.toLowerCase().includes('ml') ? ' 100ml' : '')} ({i.unit})</option>)}
               </select>
             </p>
             <p>
@@ -855,7 +855,7 @@ function InventoryDailyBazarView({ token, onBack }) {
             <p>
               <label>Ingredient</label>
               <select style={{ width: "100%" }} value={selectedIng} onChange={e => setSelectedIng(e.target.value)}>
-                {inventory.map(i => <option key={i.id} value={i.id}>{i.name}{(i.unit === 'g' || i.unit === 'gm') && !i.name.toLowerCase().includes('gm') ? ' 100gm' : ''} ({i.unit})</option>)}
+                {inventory.map(i => <option key={i.id} value={i.id}>{i.name}{(i.unit === 'g' || i.unit === 'gm') && !i.name.toLowerCase().includes('gm') ? ' 100gm' : (i.unit === 'ml' && !i.name.toLowerCase().includes('ml') ? ' 100ml' : '')} ({i.unit})</option>)}
               </select>
             </p>
             <p>
@@ -1111,7 +1111,7 @@ function BarcodeCatalogView({ token, onBack }) {
                 </div>
 
                 <div style={{ fontSize: "1rem", fontWeight: 800, margin: "0.2rem 0 0.5rem", color: "var(--ink)", minHeight: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {item.name}{!isDish && (item.unit === 'g' || item.base_unit === 'g') && !item.name.toLowerCase().includes('gm') ? ' 100gm' : ''}
+                  {item.name}{!isDish ? ((item.unit === 'g' || item.base_unit === 'g' || item.unit === 'gm') && !item.name.toLowerCase().includes('gm') ? ' 100gm' : ((item.unit === 'ml' || item.base_unit === 'ml') && !item.name.toLowerCase().includes('ml') ? ' 100ml' : '')) : ''}
                 </div>
 
                 {item.barcode && (

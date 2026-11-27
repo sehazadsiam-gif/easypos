@@ -23,6 +23,9 @@ export const formatBazarName = (name, unit = "g") => {
   if ((u === "g" || u === "gm") && !name.toLowerCase().includes("gm")) {
     return `${name} 100gm`;
   }
+  if (u === "ml" && !name.toLowerCase().includes("ml")) {
+    return `${name} 100ml`;
+  }
   return name;
 };
 
@@ -725,7 +728,7 @@ function RecipesView({ token, api, userRole }) {
         name: quickBazar.name.trim(),
         unit: quickBazar.unit,
         pack_size: parseFloat(quickBazar.pack_size || "100"),
-        pack_unit: quickBazar.unit === "g" ? `${quickBazar.pack_size || 100}gm` : `${quickBazar.pack_size} ${quickBazar.unit}`,
+        pack_unit: quickBazar.unit === "g" ? `${quickBazar.pack_size || 100}gm` : quickBazar.unit === "ml" ? `${quickBazar.pack_size || 100}ml` : `${quickBazar.pack_size} ${quickBazar.unit}`,
         min_stock: parseInt(quickBazar.min_stock || "100", 10),
       });
       // Refresh bazar items
@@ -1401,7 +1404,7 @@ function InventoryOverviewView({ token, api, userRole }) {
         barcode: newBazar.barcode.trim() ? newBazar.barcode.trim().toUpperCase() : null,
         unit: newBazar.unit,
         pack_size: parseFloat(newBazar.pack_size || "100"),
-        pack_unit: newBazar.unit === "g" ? `${newBazar.pack_size || 100}gm` : `${newBazar.pack_size} ${newBazar.unit}`,
+        pack_unit: newBazar.unit === "g" ? `${newBazar.pack_size || 100}gm` : newBazar.unit === "ml" ? `${newBazar.pack_size || 100}ml` : `${newBazar.pack_size} ${newBazar.unit}`,
         min_stock: parseInt(newBazar.min_stock || "100", 10),
       });
       setNewBazar({ name: "", barcode: "", unit: "g", pack_size: "100", min_stock: "100" });
