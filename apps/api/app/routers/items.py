@@ -2,7 +2,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.dependencies import get_db, auth, apply_postgres_rls
 from app.models import Item, Recipe, RecipeItem
-from app.schemas import ItemIn
+from app.schemas import ItemIn, ItemUpdateIn
 from app.services.inventory_service import validate_barcode, get_approved_recipe
 
 router = APIRouter(prefix="/items", tags=["items"])
@@ -90,3 +90,44 @@ def add_item(b: ItemIn, u=Depends(auth), db=Depends(get_db)):
     db.add(i)
     db.commit()
     return {"id": i.id, "name": i.name, "barcode": i.barcode, "price": i.price}
+
+
+@router.patch("/{item_id}")
+def update_item(item_id: int, b: ItemUpdateIn, u=Depends(auth), db=Depends(get_db)):
+    if u["role"] not in ("owner", "manager"):
+        raise HTTPException(403, "Managers only")
+    apply_postgres_rls(db, u["tid"])
+
+    it = db.query(Item).filter_by(tenant_id=u["tid"], id=item_id).first()
+    if not it:
+        raise HTTPException(404, "Item not found")
+
+    # If price is explicitly passed (including 0 or None to reset)
+    if b.price is not None:
+        it.price = b.price if b.price > 0 else None
+    if b.name is not None:
+        it.name = b.name.strip()
+    if b.barcode is not None:
+        clean_barcode = validate_barcode(b.barcode)
+        if clean_barcode != it.barcode:
+            exists = db.query(Item).filter_by(tenant_id=u["tid"], barcode=clean_barcode).first()
+            if exists:
+                raise HTTPException(400, f"Barcode '{clean_barcode}' already in use")
+            it.barcode = clean_barcode
+    if b.category is not None:
+        it.category = b.category
+    if b.station is not None:
+        it.station = b.station
+    if b.image_url is not None:
+        it.image_url = b.image_url
+
+    db.commit()
+    db.refresh(it)
+    return {
+        "id": it.id,
+        "name": it.name,
+        "barcode": it.barcode,
+        "category": it.category,
+        "price": it.price,
+        "station": it.station,
+    }

@@ -14,6 +14,14 @@ class ItemIn(BaseModel):
     station: str = "kitchen"
     image_url: Optional[str] = None
 
+class ItemUpdateIn(BaseModel):
+    name: Optional[str] = None
+    price: Optional[int] = None
+    barcode: Optional[str] = None
+    category: Optional[str] = None
+    station: Optional[str] = None
+    image_url: Optional[str] = None
+
 class ShiftIn(BaseModel):
     label: str = "Shift 1"
     opening_cash: int = 0

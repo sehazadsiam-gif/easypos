@@ -14,7 +14,7 @@ const formatQty = (qty, baseUnit) => {
   return `${n} ${baseUnit || ""}`.trim();
 };
 
-const tk = (p) => (p != null ? "৳" + (p / 100).toFixed(2) : "—");
+const tk = (p) => (p != null && p > 0 ? "৳" + (p / 100).toFixed(2) : "Needs Price");
 
 function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
   const isManager = userRole === "owner" || userRole === "manager";
@@ -1150,58 +1150,197 @@ function RecipesView({ token, api, userRole }) {
   );
 }
 
-function MenuApprovedView({ token, api }) {
+function MenuApprovedView({ token, api, userRole }) {
   const [items, setItems] = useState([]);
   const [selectedBarcode, setSelectedBarcode] = useState(null);
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editPrice, setEditPrice] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("All");
+
+  const loadItems = () => {
+    api("/items", token).then(setItems).catch(() => {});
+  };
 
   useEffect(() => {
-    api("/items?approved_only=true", token).then(setItems).catch(() => {});
+    loadItems();
   }, [token]);
+
+  const handleStartEdit = (m, e) => {
+    e.stopPropagation();
+    setEditingItemId(m.id);
+    setEditPrice(m.price ? (m.price / 100).toString() : "");
+  };
+
+  const handleSavePrice = async (item_id, e) => {
+    e.stopPropagation();
+    const parsed = parseFloat(editPrice);
+    if (isNaN(parsed) || parsed < 0) {
+      alert("Please enter a valid selling price in Taka (e.g. 399)");
+      return;
+    }
+    setSaving(true);
+    try {
+      const pricePaisa = parsed > 0 ? Math.round(parsed * 100) : 0;
+      await api(`/items/${item_id}`, token, {
+        method: "PATCH",
+        body: { price: pricePaisa }
+      });
+      setEditingItemId(null);
+      loadItems();
+    } catch (err) {
+      alert("Failed to update price: " + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const categories = ["All", ...new Set(items.map(i => i.category || "General"))];
+  const filtered = items.filter(m => {
+    const matchesCat = category === "All" || (m.category || "General") === category;
+    const matchesSearch = !search.trim() || 
+      m.name.toLowerCase().includes(search.toLowerCase()) || 
+      (m.barcode && m.barcode.toLowerCase().includes(search.toLowerCase()));
+    return matchesCat && matchesSearch;
+  });
+
+  const unpricedCount = items.filter(i => !i.price || i.price <= 0).length;
 
   return (
     <div className="card">
-      <div className="row" style={{ marginBottom: "0.5rem" }}>
+      <div className="row" style={{ marginBottom: "1rem", flexWrap: "wrap", gap: "1rem", justifyContent: "space-between" }}>
         <div>
-          <h3 style={{ margin: 0, color: "var(--blue-primary)" }}>Approved Menu ({items.length})</h3>
+          <h3 style={{ margin: 0, color: "var(--blue-primary)" }}>Menu & Manual Selling Prices ({items.length})</h3>
           <p style={{ color: "var(--gray)", fontSize: "0.85rem", margin: "4px 0 0" }}>
-            Each approved menu item has an active Code128 barcode ready to scan in Daily Sale. Click any item to preview its barcode.
+            Click <b>Set Price</b> on any dish to manually enter its selling price in Taka.
+            {unpricedCount > 0 && (
+              <span style={{ marginLeft: "8px", background: "#fef3c7", color: "#92400e", padding: "3px 8px", borderRadius: "999px", fontWeight: 700, fontSize: "0.78rem" }}>
+                ⚠️ {unpricedCount} dishes need selling price
+              </span>
+            )}
           </p>
+        </div>
+        <div>
+          <input
+            type="text"
+            placeholder="🔍 Search dish or barcode..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: "220px", padding: "6px 10px" }}
+          />
         </div>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem", marginTop: "1rem" }}>
-        {items.map((m) => (
-          <div
-            key={m.id}
-            className="card"
-            style={{
-              padding: "1rem",
-              cursor: "pointer",
-              border: selectedBarcode === m.barcode ? "2px solid var(--blue-primary)" : "1px solid var(--line)",
-              background: selectedBarcode === m.barcode ? "var(--blue-light)" : "#fff",
-              textAlign: "center"
-            }}
-            onClick={() => setSelectedBarcode(selectedBarcode === m.barcode ? null : m.barcode)}
-          >
-            <div className="row" style={{ marginBottom: "0.4rem" }}>
-              <b>{m.name}</b>
-              <span style={{ background: "var(--green-light)", color: "#065f46", fontSize: "0.72rem", fontWeight: 700, padding: "2px 6px", borderRadius: "4px" }}>
-                v{m.approved_recipe_version}
-              </span>
-            </div>
+      {/* Category Filter Pills */}
+      <div className="nav-tabs" style={{ marginBottom: "1.2rem" }}>
+        {categories.map(c => {
+          const count = c === "All" ? items.length : items.filter(i => (i.category || "General") === c).length;
+          return (
+            <button key={c} className={category === c ? "active" : ""} onClick={() => setCategory(c)}>
+              {c} <span style={{ opacity: 0.65, fontSize: "0.78rem" }}>({count})</span>
+            </button>
+          );
+        })}
+      </div>
 
-            {m.barcode && (
-              <div style={{ margin: "0.5rem 0", background: "#fff", padding: "4px", borderRadius: "6px" }}>
-                <BarcodeSvg value={m.barcode} width={1.8} height={50} />
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1rem" }}>
+        {filtered.map((m) => {
+          const isEditing = editingItemId === m.id;
+          const hasPrice = m.price != null && m.price > 0;
+          return (
+            <div
+              key={m.id}
+              className="card"
+              style={{
+                padding: "1rem",
+                border: selectedBarcode === m.barcode ? "2px solid var(--blue-primary)" : hasPrice ? "1.5px solid var(--line)" : "2px dashed #f59e0b",
+                background: selectedBarcode === m.barcode ? "var(--blue-light)" : "#fff",
+                borderRadius: "12px",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                cursor: "pointer"
+              }}
+              onClick={() => setSelectedBarcode(selectedBarcode === m.barcode ? null : m.barcode)}
+            >
+              <div>
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.4rem" }}>
+                  <b style={{ fontSize: "1rem", color: "var(--ink)", lineHeight: 1.3 }}>{m.name}</b>
+                  <span style={{ 
+                    background: hasPrice ? "var(--green-light)" : "#fef3c7", 
+                    color: hasPrice ? "#065f46" : "#b45309", 
+                    fontSize: "0.72rem", 
+                    fontWeight: 700, 
+                    padding: "2px 6px", 
+                    borderRadius: "4px" 
+                  }}>
+                    {hasPrice ? "Priced" : "Needs Price"}
+                  </span>
+                </div>
+
+                <div style={{ fontSize: "0.78rem", color: "var(--gray)", marginBottom: "0.5rem" }}>
+                  Category: <b>{m.category || "General"}</b> · Station: <b>{m.station || "kitchen"}</b>
+                </div>
+
+                {m.barcode && (
+                  <div style={{ margin: "0.4rem 0", background: "#fff", padding: "6px", borderRadius: "6px", border: "1px solid #f1f5f9", textAlign: "center" }}>
+                    <BarcodeSvg value={m.barcode} width={1.6} height={42} />
+                    <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "#64748b", marginTop: "2px" }}>{m.barcode}</div>
+                  </div>
+                )}
               </div>
-            )}
 
-            <div className="row" style={{ marginTop: "4px", fontSize: "0.85rem" }}>
-              <code style={{ fontSize: "0.8rem" }}>{m.barcode}</code>
-              <b style={{ color: "var(--blue-primary)" }}>{tk(m.price)}</b>
+              <div style={{ marginTop: "0.8rem", borderTop: "1px solid #f1f5f9", paddingTop: "0.6rem" }}>
+                {isEditing ? (
+                  <div onClick={(e) => e.stopPropagation()} style={{ background: "#f8fafc", padding: "8px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                    <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--ink)", display: "block", marginBottom: "4px" }}>
+                      Enter Selling Price in Taka (৳):
+                    </label>
+                    <div className="row" style={{ gap: "4px" }}>
+                      <input
+                        type="number"
+                        step="1"
+                        placeholder="e.g. 399"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSavePrice(m.id, e);
+                          if (e.key === "Escape") setEditingItemId(null);
+                        }}
+                        style={{ flex: 1, padding: "6px 8px", fontSize: "0.95rem", fontWeight: 700 }}
+                      />
+                      <button className="primary" style={{ padding: "6px 12px", fontSize: "0.82rem" }} disabled={saving} onClick={(e) => handleSavePrice(m.id, e)}>
+                        {saving ? "..." : "Save"}
+                      </button>
+                      <button style={{ padding: "6px 8px", fontSize: "0.82rem" }} onClick={(e) => { e.stopPropagation(); setEditingItemId(null); }}>
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <span style={{ fontSize: "0.75rem", color: "var(--gray)", display: "block" }}>Selling Price:</span>
+                      <b style={{ color: hasPrice ? "var(--blue-primary)" : "#d97706", fontSize: "1.05rem" }}>
+                        {hasPrice ? tk(m.price) : "Not Set (—)"}
+                      </b>
+                    </div>
+                    <button
+                      className={hasPrice ? "" : "primary"}
+                      style={{ fontSize: "0.8rem", padding: "5px 12px", borderRadius: "6px" }}
+                      onClick={(e) => handleStartEdit(m, e)}
+                    >
+                      {hasPrice ? "✏️ Edit Price" : "➕ Set Price"}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1474,7 +1613,7 @@ export function InventorySuite({ token, api, userRole, onBack }) {
         <BatchScannerView batchType={tab} token={token} api={api} userRole={userRole} />
       )}
       {tab === "recipes" && <RecipesView token={token} api={api} userRole={userRole} />}
-      {tab === "menu" && <MenuApprovedView token={token} api={api} />}
+      {tab === "menu" && <MenuApprovedView token={token} api={api} userRole={userRole} />}
       {tab === "overview" && <InventoryOverviewView token={token} api={api} userRole={userRole} />}
     </div>
   );
