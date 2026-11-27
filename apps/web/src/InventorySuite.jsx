@@ -146,6 +146,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
   const [msg, setMsg] = useState({ text: "", type: "info" });
   const [editApprovedMode, setEditApprovedMode] = useState(false);
   const [showOwnerAuth, setShowOwnerAuth] = useState(false);
+  const [showClearAuth, setShowClearAuth] = useState(false);
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const scanRef = useRef(null);
 
@@ -520,6 +521,17 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                 />
               )}
               <button className="secondary" onClick={startNewDraft}>+ New Draft</button>
+              <button
+                className="warn"
+                style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                onClick={() => setShowClearAuth(true)}
+                title="Clear all records in this section (Owner Password required)"
+              >
+                <IconLock size={13} />
+                <span>
+                  {batchType === "central" ? "Clear Opening Stock" : batchType === "bazar" ? "Clear Daily Bazar" : "Clear Daily Sale"}
+                </span>
+              </button>
             </div>
           </div>
 
@@ -828,6 +840,27 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
               description={`Enter the Owner password to save edits to approved ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} Batch #${activeBatch?.id}. Stock ledger entries will be reconciled automatically.`}
               onClose={() => setShowOwnerAuth(false)}
               onConfirm={saveApprovedChanges}
+            />
+          )}
+
+          {showClearAuth && (
+            <OwnerPasswordModal
+              title={`Clear All ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"}`}
+              description={`This will permanently delete all ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} batches and recalculate current stock balances. Only possible with the Owner password.`}
+              onClose={() => setShowClearAuth(false)}
+              onConfirm={async (ownerPassword) => {
+                await api("/inventory/clear", token, { scope: batchType, owner_password: ownerPassword });
+                setShowClearAuth(false);
+                setActiveBatch(null);
+                setLines([]);
+                setEditApprovedMode(false);
+                setMsg({
+                  text: `All ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} records cleared with Owner authorization.`,
+                  type: "info",
+                });
+                loadData();
+                onChanged?.();
+              }}
             />
           )}
         </div>
@@ -1664,6 +1697,7 @@ function InventoryOverviewView({ token, api, userRole }) {
   const [lastCreatedBazar, setLastCreatedBazar] = useState(null);
   const [msg, setMsg] = useState("");
   const [reverseTargetId, setReverseTargetId] = useState(null);
+  const [clearScope, setClearScope] = useState(null); // "central" | "bazar" | "sale" | "all" | null
 
   const load = async () => {
     try {
@@ -1738,6 +1772,69 @@ function InventoryOverviewView({ token, api, userRole }) {
           onConfirm={confirmReverseEntry}
         />
       )}
+
+      {clearScope && (
+        <OwnerPasswordModal
+          title={
+            clearScope === "all"
+              ? "Reset All Inventory & Stocks to Zero"
+              : clearScope === "central"
+              ? "Clear Monthly Opening Stock"
+              : clearScope === "bazar"
+              ? "Clear All Daily Bazar"
+              : "Clear All Daily Sale"
+          }
+          description={
+            clearScope === "all"
+              ? "This will permanently clear all Monthly Opening Stock, Daily Bazar, Daily Sale batches, and stock ledger entries, setting all stocks to 0 (menu & ingredient catalog remain intact). Owner password required."
+              : `This will permanently delete all ${clearScope === "central" ? "Monthly Opening Stock" : clearScope === "bazar" ? "Daily Bazar" : "Daily Sale"} records and recalculate stock balances. Owner password required.`
+          }
+          onClose={() => setClearScope(null)}
+          onConfirm={async (ownerPassword) => {
+            await api("/inventory/clear", token, { scope: clearScope, owner_password: ownerPassword });
+            const label =
+              clearScope === "all"
+                ? "All inventory & stocks reset to zero"
+                : clearScope === "central"
+                ? "Monthly Opening Stock cleared"
+                : clearScope === "bazar"
+                ? "Daily Bazar cleared"
+                : "Daily Sale cleared";
+            setClearScope(null);
+            setMsg(`${label} with Owner authorization.`);
+            load();
+          }}
+        />
+      )}
+
+      <div className="card" style={{ borderColor: "var(--rose-border)", background: "#fffafb" }}>
+        <div className="row" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
+          <div>
+            <h4 style={{ margin: 0, color: "var(--rose)", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+              <IconLock size={15} color="var(--rose)" />
+              <span>Owner-Protected Data Reset & Clear</span>
+            </h4>
+            <p style={{ margin: "2px 0 0", fontSize: "0.82rem", color: "var(--ink-muted)" }}>
+              Clear Daily Bazar, Daily Sale, Opening Stock, or reset all inventory stocks to zero. Only possible with Owner Password.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button className="warn" style={{ minHeight: "36px", fontSize: "0.82rem" }} onClick={() => setClearScope("central")}>
+              Clear Opening Stock
+            </button>
+            <button className="warn" style={{ minHeight: "36px", fontSize: "0.82rem" }} onClick={() => setClearScope("bazar")}>
+              Clear Daily Bazar
+            </button>
+            <button className="warn" style={{ minHeight: "36px", fontSize: "0.82rem" }} onClick={() => setClearScope("sale")}>
+              Clear Daily Sale
+            </button>
+            <button className="danger-solid" style={{ minHeight: "36px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }} onClick={() => setClearScope("all")}>
+              <IconLock size={13} />
+              <span>Reset All Stocks</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="card">
         <div className="row" style={{ flexWrap: "wrap", marginBottom: "0.75rem" }}>

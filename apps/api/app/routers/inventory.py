@@ -1,9 +1,12 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.dependencies import get_db, auth, apply_postgres_rls, verify_owner_password
-from app.models import Ingredient, RecipeItem, Item, DailyBazar, StockMovement, BazarTrip, StockLedger, User
-from app.schemas import IngredientIn, RecipeSetIn, DailyBazarIn, WastageIn, BazarTripIn, LedgerReversalIn
-from app.services.inventory_service import get_inventory_summary, validate_barcode, today_str
+from app.models import (
+    Ingredient, RecipeItem, Item, DailyBazar, StockMovement,
+    BazarTrip, StockLedger, User, InventoryBatch, InventoryBatchLine
+)
+from app.schemas import IngredientIn, RecipeSetIn, DailyBazarIn, WastageIn, BazarTripIn, LedgerReversalIn, InventoryClearIn
+from app.services.inventory_service import get_inventory_summary, get_current_stock_map, validate_barcode, today_str
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -353,3 +356,66 @@ def create_production_bazar_trip(b: BazarTripIn, u=Depends(auth), db=Depends(get
 
     db.commit()
     return {"id": trip.id, "total_cost": total_cost, "status": "approved"}
+
+
+@router.post("/clear")
+def clear_inventory_scope(b: InventoryClearIn, u=Depends(auth), db=Depends(get_db)):
+    """Clear Monthly Opening Stock (central), Daily Bazar (bazar), Daily Sale (sale), or ALL stocks. Strictly requires Owner Password."""
+    valid_scopes = {"central", "bazar", "sale", "all"}
+    if b.scope not in valid_scopes:
+        raise HTTPException(400, "Invalid scope. Must be central, bazar, sale, or all")
+
+    apply_postgres_rls(db, u["tid"])
+    verify_owner_password(db, u["tid"], b.owner_password)
+
+    tid = u["tid"]
+    batches_deleted = 0
+    ledger_deleted = 0
+
+    if b.scope == "all":
+        db.query(InventoryBatchLine).filter_by(tenant_id=tid).delete(synchronize_session=False)
+        batches_deleted = db.query(InventoryBatch).filter_by(tenant_id=tid).delete(synchronize_session=False)
+        ledger_deleted = db.query(StockLedger).filter_by(tenant_id=tid).delete(synchronize_session=False)
+        db.query(DailyBazar).filter_by(tenant_id=tid).delete(synchronize_session=False)
+        db.query(StockMovement).filter_by(tenant_id=tid).delete(synchronize_session=False)
+        db.query(Ingredient).filter_by(tenant_id=tid).update({"current_stock": 0}, synchronize_session=False)
+    else:
+        batch_rows = db.query(InventoryBatch.id).filter_by(tenant_id=tid, batch_type=b.scope).all()
+        batch_ids = [row[0] for row in batch_rows]
+
+        if batch_ids:
+            db.query(InventoryBatchLine).filter(
+                InventoryBatchLine.tenant_id == tid,
+                InventoryBatchLine.batch_id.in_(batch_ids),
+            ).delete(synchronize_session=False)
+
+            ledger_deleted += db.query(StockLedger).filter(
+                StockLedger.tenant_id == tid,
+                StockLedger.batch_id.in_(batch_ids),
+            ).delete(synchronize_session=False)
+
+            batches_deleted = db.query(InventoryBatch).filter(
+                InventoryBatch.tenant_id == tid,
+                InventoryBatch.id.in_(batch_ids),
+            ).delete(synchronize_session=False)
+
+        # Also delete any standalone ledger entries of this scope type
+        ledger_deleted += db.query(StockLedger).filter_by(tenant_id=tid, type=b.scope).delete(synchronize_session=False)
+
+        if b.scope == "bazar":
+            db.query(DailyBazar).filter_by(tenant_id=tid).delete(synchronize_session=False)
+            db.query(StockMovement).filter_by(tenant_id=tid, movement_type="daily_bazar").delete(synchronize_session=False)
+
+        db.flush()
+        # Re-sync Ingredient.current_stock from remaining StockLedger sums
+        stock_map = get_current_stock_map(db, tid)
+        for ing in db.query(Ingredient).filter_by(tenant_id=tid).all():
+            ing.current_stock = stock_map.get(ing.id, 0)
+
+    db.commit()
+    return {
+        "status": "cleared",
+        "scope": b.scope,
+        "batches_deleted": batches_deleted,
+        "ledger_entries_deleted": ledger_deleted,
+    }

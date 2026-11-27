@@ -192,3 +192,9 @@ class BatchApproveIn(BaseModel):
 class LedgerReversalIn(BaseModel):
     reason: str
     owner_password: Optional[str] = None
+
+
+class InventoryClearIn(BaseModel):
+    scope: str  # "central", "bazar", "sale", "all"
+    owner_password: Optional[str] = None
+    reason: Optional[str] = None

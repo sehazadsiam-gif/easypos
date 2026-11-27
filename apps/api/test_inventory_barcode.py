@@ -266,3 +266,44 @@ def test_qty_prefix_rejected_on_barcodes():
     assert r1.status_code == 400
     r2 = client.post("/items", json={"name": "Bad Menu", "barcode": "QTY-PLUS1KG"}, headers=owner_h)
     assert r2.status_code == 400
+
+
+def test_clear_inventory_requires_owner_password():
+    owner_h = get_headers("owner")
+    mgr_h = get_headers("manager")
+
+    bc = f"ING-CLR-{uuid.uuid4().hex[:5].upper()}"
+    ing_id = client.post("/inventory", json={
+        "name": "Clear Test Sugar", "unit": "g", "barcode": bc, "pack_size": 100, "min_stock": 100
+    }, headers=owner_h).json()["id"]
+
+    # Add 500g via Monthly Opening Stock (central) and 300g via Daily Bazar (bazar)
+    cb = client.post("/batches", json={"batch_type": "central"}, headers=owner_h).json()["id"]
+    client.put(f"/batches/{cb}/lines", json={"lines": [{"bazar_item_id": ing_id, "quantity": 500, "pack_count": 5}]}, headers=owner_h)
+    client.post(f"/batches/{cb}/approve", json={}, headers=owner_h)
+
+    bb = client.post("/batches", json={"batch_type": "bazar"}, headers=owner_h).json()["id"]
+    client.put(f"/batches/{bb}/lines", json={"lines": [{"bazar_item_id": ing_id, "quantity": 300, "pack_count": 3}]}, headers=owner_h)
+    client.post(f"/batches/{bb}/approve", json={}, headers=owner_h)
+
+    # Without owner password or with manager password -> rejected 403
+    assert client.post("/inventory/clear", json={"scope": "bazar"}, headers=mgr_h).status_code == 403
+    assert client.post("/inventory/clear", json={"scope": "bazar", "owner_password": "456456"}, headers=mgr_h).status_code == 403
+    assert client.post("/inventory/clear", json={"scope": "all", "owner_password": "wrong"}, headers=owner_h).status_code == 403
+
+    # Clear Daily Bazar with valid owner password -> leaves central 500g intact
+    r_clr_bazar = client.post("/inventory/clear", json={"scope": "bazar", "owner_password": "258000"}, headers=mgr_h)
+    assert r_clr_bazar.status_code == 200
+    inv = client.get("/inventory", headers=owner_h).json()
+    item = next(x for x in inv if x["id"] == ing_id)
+    assert item["bazar_total"] == 0
+    assert item["central_total"] == 500
+    assert item["current_stock"] == 500
+
+    # Clear All Inventory & Stocks with valid owner password -> resets stock to 0 while keeping item
+    r_clr_all = client.post("/inventory/clear", json={"scope": "all", "owner_password": "258000"}, headers=owner_h)
+    assert r_clr_all.status_code == 200
+    inv2 = client.get("/inventory", headers=owner_h).json()
+    item2 = next(x for x in inv2 if x["id"] == ing_id)
+    assert item2["central_total"] == 0
+    assert item2["current_stock"] == 0
