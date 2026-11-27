@@ -80,20 +80,11 @@ def seed():
                 item_obj.price = None
         db.flush()
 
-        if existing_dish_count < 30:
-            # Clear old demo items, recipes, ingredients if any to prevent duplicates
-            db.query(RecipeItem).filter(RecipeItem.tenant_id == t.id).delete()
-            db.query(Recipe).filter(Recipe.tenant_id == t.id).delete()
-            db.query(Item).filter(Item.tenant_id == t.id).delete()
-            db.query(InventoryBatchLine).filter(InventoryBatchLine.tenant_id == t.id).delete()
-            db.query(StockLedger).filter(StockLedger.tenant_id == t.id).delete()
-            db.query(InventoryBatch).filter(InventoryBatch.tenant_id == t.id).delete()
-            db.query(Ingredient).filter(Ingredient.tenant_id == t.id).delete()
-            db.flush()
-
-            # Seed 31 Crown Coffee dishes
-            created_items = {}
-            for d in CROWN_ITEMS:
+        # Seed/Upsert 31 Crown Coffee dishes with barcodes
+        created_items = {}
+        for d in CROWN_ITEMS:
+            it = db.query(Item).filter_by(tenant_id=t.id, name=d["name"]).first()
+            if not it:
                 it = Item(
                     tenant_id=t.id,
                     branch_id=b.id,
@@ -105,11 +96,19 @@ def seed():
                 )
                 db.add(it)
                 db.flush()
-                created_items[d["name"]] = it
+            else:
+                it.barcode = d["barcode"]
+                it.category = d["category"]
+                it.station = d["station"]
+                db.flush()
+            created_items[d["name"]] = it
 
-            # Seed ingredients
-            created_ingredients = {}
-            for ing in CROWN_INGREDIENTS:
+        # Seed/Upsert 111 ingredients with barcodes
+        created_ingredients = {}
+        for ing in CROWN_INGREDIENTS:
+            ing_key = ing["name"].lower().strip()
+            obj = db.query(Ingredient).filter_by(tenant_id=t.id, name=ing["name"]).first()
+            if not obj:
                 obj = Ingredient(
                     tenant_id=t.id,
                     barcode=ing["barcode"],
@@ -123,9 +122,49 @@ def seed():
                 )
                 db.add(obj)
                 db.flush()
-                created_ingredients[ing["name"].lower().strip()] = obj
+            else:
+                obj.barcode = ing["barcode"]
+                obj.unit = ing["unit"]
+                obj.pack_size = ing["pack_size"]
+                obj.pack_unit = ing["pack_unit"]
+                obj.cost_per_unit = ing["cost_per_unit"]
+                db.flush()
+            created_ingredients[ing_key] = obj
 
-            # Seed initial central inventory batch & stock ledger
+        # Seed/Upsert approved recipes for all dishes
+        for dish_name, lines_data in CROWN_RECIPES.items():
+            item_obj = created_items.get(dish_name)
+            if not item_obj:
+                continue
+            rec = db.query(Recipe).filter_by(tenant_id=t.id, item_id=item_obj.id, status="approved").first()
+            if not rec:
+                rec = Recipe(
+                    tenant_id=t.id,
+                    item_id=item_obj.id,
+                    version=1,
+                    status="approved",
+                    created_by=owner.id,
+                    approved_by=owner.id,
+                )
+                db.add(rec)
+                db.flush()
+                for line in lines_data:
+                    ing_obj = created_ingredients.get(line["ingredient"].lower().strip())
+                    if not ing_obj:
+                        continue
+                    db.add(RecipeItem(
+                        tenant_id=t.id,
+                        recipe_id=rec.id,
+                        item_id=item_obj.id,
+                        ingredient_id=ing_obj.id,
+                        qty=line["qty"],
+                        input_amount=line["input_amount"],
+                        input_unit=line["input_unit"],
+                        version=1,
+                    ))
+
+        # Ensure opening central inventory batch exists if none
+        if not db.query(InventoryBatch).filter_by(tenant_id=t.id).first():
             today = date.today().isoformat()
             central_batch = InventoryBatch(
                 tenant_id=t.id,
@@ -157,36 +196,6 @@ def seed():
                     reason="Opening Central Stock",
                     created_by=owner.id,
                 ))
-
-            # Seed approved recipes for all dishes
-            for dish_name, lines_data in CROWN_RECIPES.items():
-                item_obj = created_items.get(dish_name)
-                if not item_obj:
-                    continue
-                rec = Recipe(
-                    tenant_id=t.id,
-                    item_id=item_obj.id,
-                    version=1,
-                    status="approved",
-                    created_by=owner.id,
-                    approved_by=owner.id,
-                )
-                db.add(rec)
-                db.flush()
-                for line in lines_data:
-                    ing_obj = created_ingredients.get(line["ingredient"].lower().strip())
-                    if not ing_obj:
-                        continue
-                    db.add(RecipeItem(
-                        tenant_id=t.id,
-                        recipe_id=rec.id,
-                        item_id=item_obj.id,
-                        ingredient_id=ing_obj.id,
-                        qty=line["qty"],
-                        input_amount=line["input_amount"],
-                        input_unit=line["input_unit"],
-                        version=1,
-                    ))
 
         if not db.query(TableLayout).first():
             default_layout = [

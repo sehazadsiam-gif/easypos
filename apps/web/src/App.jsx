@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { getOutbox, queueOutbox, flushOutbox } from "./outbox";
-import { PrintableBarcodeSheet } from "./BarcodeSheet";
+import { PrintableBarcodeSheet, BarcodeSvg } from "./BarcodeSheet";
 import { InventorySuite } from "./InventorySuite";
 
 const api = async (path, token, body, method) => {
@@ -400,6 +400,21 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
                 </div>
 
                 <div style={{ width: "100%", marginTop: "0.6rem" }}>
+                  {i.barcode && (
+                    <div style={{ marginBottom: "0.4rem", textAlign: "left" }}>
+                      <span style={{
+                        background: "rgba(79, 70, 229, 0.08)",
+                        color: "var(--brand-primary)",
+                        fontFamily: "monospace",
+                        fontSize: "0.74rem",
+                        fontWeight: 700,
+                        padding: "2px 6px",
+                        borderRadius: "4px"
+                      }}>
+                        {i.barcode}
+                      </span>
+                    </div>
+                  )}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{
                       background: "#f1f5f9",
@@ -931,6 +946,164 @@ function TableLayoutEditor({ token, onBack }) {
   );
 }
 
+function BarcodeCatalogView({ token, onBack }) {
+  const [tab, setTab] = useState("all");
+  const [subCat, setSubCat] = useState("All");
+  const [search, setSearch] = useState("");
+  const [dishes, setDishes] = useState([]);
+  const [ingredients, setIngredients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedBarcode, setSelectedBarcode] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      api("/items", token).catch(() => []),
+      api("/inventory", token).catch(() => [])
+    ]).then(([d, ing]) => {
+      setDishes(d);
+      setIngredients(ing);
+      setLoading(false);
+    });
+  }, [token]);
+
+  const allItems = [
+    ...dishes.map(d => ({ ...d, itemType: "dish", typeLabel: "🍽️ Menu Dish" })),
+    ...ingredients.map(i => ({ ...i, itemType: "ingredient", typeLabel: "🛒 Ingredient" }))
+  ];
+
+  const filtered = allItems.filter(item => {
+    if (tab === "dishes" && item.itemType !== "dish") return false;
+    if (tab === "ingredients" && item.itemType !== "ingredient") return false;
+    if (subCat !== "All") {
+      const cat = item.category || "General";
+      if (cat !== subCat) return false;
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const matchName = item.name.toLowerCase().includes(q);
+      const matchBarcode = item.barcode && item.barcode.toLowerCase().includes(q);
+      return matchName || matchBarcode;
+    }
+    return true;
+  });
+
+  const dishesCategories = ["All", ...new Set(dishes.map(d => d.category || "General"))];
+  const activeCategories = tab === "dishes" ? dishesCategories : [];
+
+  return (
+    <div className="card" style={{ maxWidth: "1280px", margin: "0 auto", padding: "1.5rem" }}>
+      <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem", marginBottom: "1.2rem", borderBottom: "1.5px solid var(--line)", paddingBottom: "1rem" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <button onClick={onBack} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>← Back to POS</button>
+            <h2 style={{ margin: 0, color: "var(--brand-primary)" }}>🏷️ Crown Coffee Barcode Catalog</h2>
+          </div>
+          <p style={{ margin: "6px 0 0", color: "var(--ink-muted)", fontSize: "0.9rem" }}>
+            Total <b>{dishes.length} Menu Dishes</b> (<code>MENU-</code>) and <b>{ingredients.length} Bazar Ingredients</b> (<code>ING-</code>). Scannable with any standard USB barcode scanner.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button className="primary" onClick={() => window.print()}>🖨 Print Barcode Sheet</button>
+        </div>
+      </div>
+
+      <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+        <div className="nav-tabs" style={{ margin: 0 }}>
+          <button className={tab === "all" ? "active" : ""} onClick={() => { setTab("all"); setSubCat("All"); }}>
+            All Barcodes ({allItems.length})
+          </button>
+          <button className={tab === "dishes" ? "active" : ""} onClick={() => { setTab("dishes"); setSubCat("All"); }}>
+            🍽️ Menu Dishes ({dishes.length})
+          </button>
+          <button className={tab === "ingredients" ? "active" : ""} onClick={() => { setTab("ingredients"); setSubCat("All"); }}>
+            🛒 Ingredients ({ingredients.length})
+          </button>
+        </div>
+        <div>
+          <input
+            type="text"
+            placeholder="🔍 Search name, MENU-, ING-..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: "260px", padding: "8px 12px", fontSize: "0.9rem" }}
+          />
+        </div>
+      </div>
+
+      {activeCategories.length > 1 && (
+        <div className="no-print nav-tabs" style={{ marginBottom: "1rem" }}>
+          {activeCategories.map(c => (
+            <button key={c} className={subCat === c ? "active" : ""} onClick={() => setSubCat(c)} style={{ fontSize: "0.8rem", padding: "4px 10px" }}>
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <p>Loading barcodes...</p>
+      ) : (
+        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1rem" }}>
+          {filtered.map(item => {
+            const isDish = item.itemType === "dish";
+            return (
+              <div
+                key={item.barcode || item.id}
+                className="card"
+                style={{
+                  padding: "1rem",
+                  border: selectedBarcode === item.barcode ? "2px solid var(--brand-primary)" : isDish ? "1.5px solid #c7d2fe" : "1.5px solid #e2e8f0",
+                  background: selectedBarcode === item.barcode ? "var(--brand-light)" : "#fff",
+                  borderRadius: "12px",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  pageBreakInside: "avoid"
+                }}
+                onClick={() => setSelectedBarcode(selectedBarcode === item.barcode ? null : item.barcode)}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                  <span style={{
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    background: isDish ? "rgba(79, 70, 229, 0.1)" : "rgba(16, 185, 129, 0.1)",
+                    color: isDish ? "var(--brand-primary)" : "#065f46"
+                  }}>
+                    {isDish ? "MENU DISH" : "BAZAR INGREDIENT"}
+                  </span>
+                  <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)", fontWeight: 600 }}>
+                    {item.category || item.unit || ""}
+                  </span>
+                </div>
+
+                <div style={{ fontSize: "1rem", fontWeight: 800, margin: "0.2rem 0 0.5rem", color: "var(--ink)", minHeight: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {item.name}
+                </div>
+
+                {item.barcode && (
+                  <div style={{ background: "#ffffff", padding: "6px", borderRadius: "8px", border: "1px solid #f1f5f9", margin: "0.4rem 0" }}>
+                    <BarcodeSvg value={item.barcode} width={1.8} height={52} />
+                  </div>
+                )}
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem", fontSize: "0.82rem" }}>
+                  <code style={{ fontSize: "0.78rem", fontWeight: 700, color: isDish ? "var(--brand-primary)" : "#0f766e" }}>
+                    {item.barcode}
+                  </code>
+                  <b style={{ color: "var(--ink)" }}>
+                    {isDish ? (item.price ? tk(item.price) : "Needs Price") : (item.cost_per_unit ? `৳${(item.cost_per_unit / 100).toFixed(2)}/${item.unit}` : item.pack_unit || item.unit)}
+                  </b>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [me, setMe] = useState(null);
   const [view, setView] = useState({ name: "home" });
@@ -1039,6 +1212,9 @@ export default function App() {
               ⚡ Sync Outbox ({outboxCount})
             </button>
           )}
+          <button className="secondary" onClick={() => setView({ name: "barcode_catalog" })} style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", minHeight: "32px", background: "var(--brand-light)", color: "var(--brand-primary)", border: "1.5px solid var(--brand-primary)" }}>
+            🏷️ Barcode Catalog
+          </button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", flexWrap: "wrap" }}>
           <span style={{ fontSize: "0.88rem", background: "var(--paper-subtle)", padding: "0.3rem 0.75rem", borderRadius: "8px" }}>
@@ -1151,6 +1327,14 @@ export default function App() {
                   <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Mushak 6.3 & Cost Tracking</span>
                 </div>
               </button>
+
+              <button className="tile" onClick={() => setView({ name: "barcode_catalog" })} style={{ minHeight: "125px", border: "1.5px solid var(--brand-primary)", background: "rgba(79, 70, 229, 0.04)" }}>
+                <span style={{ fontSize: "1.8rem" }}>🏷️</span>
+                <div>
+                  <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>Barcode Catalog</div>
+                  <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>31 Menu & 111 Ingredient Codes</span>
+                </div>
+              </button>
             </div>
 
             {open.length > 0 && (
@@ -1234,6 +1418,7 @@ export default function App() {
 
         {view.name === "inventory" && <InventorySuite token={token} api={api} userRole={me.role} onBack={home} />}
         {view.name === "table_editor" && <TableLayoutEditor token={token} onBack={home} />}
+        {view.name === "barcode_catalog" && <BarcodeCatalogView token={token} onBack={home} />}
       </main>
     </>
   );
