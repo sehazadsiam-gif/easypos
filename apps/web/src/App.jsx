@@ -55,44 +55,165 @@ const CHANNELS = [
 function Login({ onLogin }) {
   const [f, setF] = useState({ tenant: "crown", emp_id: "1001", password: "admin123" });
   const [err, setErr] = useState("");
+  const [activeRole, setActiveRole] = useState("owner");
+  const [loading, setLoading] = useState(false);
+
+  const selectRole = (role, empId) => {
+    setActiveRole(role);
+    setF({ tenant: "crown", emp_id: empId, password: "admin123" });
+    setErr("");
+  };
+
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+
   const go = async () => {
+    setLoading(true);
+    setErr("");
     try {
-      onLogin(await api("/auth/login", null, f));
+      const res = await api("/auth/login", null, f);
+      onLogin(res);
     } catch (e) {
       setErr(e.message);
+    } finally {
+      setLoading(false);
     }
   };
-  return (
-    <div className="login card">
-      <div style={{ textAlign: "center", marginBottom: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <CrownLogo size={58} style={{ marginBottom: "0.6rem", filter: "drop-shadow(0 6px 16px rgba(67, 56, 202, 0.35))" }} />
-        <h1 style={{ margin: 0, fontSize: "1.85rem", fontWeight: 900, letterSpacing: "-0.035em", background: "linear-gradient(135deg, #1e1b4b 0%, #4338ca 60%, #d97706 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-          crownpointofsale
-        </h1>
-        <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", fontWeight: 600, letterSpacing: "0.02em", margin: "0.35rem 0 0" }}>
-          Enterprise Cloud Point of Sale
-        </p>
-      </div>
-      <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray)" }}>Business Code</label>
-      <input placeholder="crown" value={f.tenant} onChange={set("tenant")} />
-      
-      <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray)" }}>Employee ID</label>
-      <input placeholder="1001" value={f.emp_id} onChange={set("emp_id")} />
-      
-      <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray)" }}>Password</label>
-      <input
-        type="password"
-        placeholder="••••••••"
-        value={f.password}
-        onChange={set("password")}
-        onKeyDown={(e) => e.key === "Enter" && go()}
-      />
-      {err && <div style={{ color: "var(--red)", fontWeight: 600, fontSize: "0.9rem" }}>{err}</div>}
-      <button className="primary" style={{ marginTop: "0.5rem", minHeight: "46px" }} onClick={go}>Sign In to Terminal</button>
 
-      <div style={{ background: "var(--blue-light)", padding: "0.6rem 0.8rem", borderRadius: "8px", fontSize: "0.78rem", color: "var(--blue-primary)", marginTop: "0.75rem" }}>
-        Staff Logins: <b>1001</b> (Owner), <b>1002</b> (Manager), <b>1003</b> (Cashier) | Password: <b>admin123</b>
+  return (
+    <div className="auth-viewport">
+      <div className="auth-header-pill">
+        <span className="live-dot" style={{ background: "#10b981" }}></span>
+        <span>Crown Enterprise Cloud POS · Terminal Node #01</span>
+      </div>
+
+      <div className="auth-card">
+        <div className="auth-brand">
+          <div className="auth-logo-aura">
+            <CrownLogo size={46} />
+          </div>
+          <h1 className="auth-title">crownpointofsale</h1>
+          <p className="auth-subtitle">
+            Enterprise Cloud Point of Sale & Terminal Console
+          </p>
+        </div>
+
+        {/* 1-Click Fast Role Switcher */}
+        <div className="auth-role-group">
+          <label className="auth-role-label">Quick Staff Access</label>
+          <div className="auth-roles-grid">
+            <button
+              type="button"
+              className={`auth-role-btn ${activeRole === "owner" ? "active" : ""}`}
+              onClick={() => selectRole("owner", "1001")}
+            >
+              <span style={{ fontSize: "1.1rem" }}>👑</span>
+              <span>Owner</span>
+            </button>
+            <button
+              type="button"
+              className={`auth-role-btn ${activeRole === "manager" ? "active" : ""}`}
+              onClick={() => selectRole("manager", "1002")}
+            >
+              <span style={{ fontSize: "1.1rem" }}>👔</span>
+              <span>Manager</span>
+            </button>
+            <button
+              type="button"
+              className={`auth-role-btn ${activeRole === "cashier" ? "active" : ""}`}
+              onClick={() => selectRole("cashier", "1003")}
+            >
+              <span style={{ fontSize: "1.1rem" }}>💳</span>
+              <span>Cashier</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Credentials Form */}
+        <div className="auth-form-field">
+          <label className="auth-form-label">
+            <span>Business Slug</span>
+            <span style={{ color: "#94a3b8", fontWeight: 500 }}>Workspace</span>
+          </label>
+          <div className="auth-input-wrapper">
+            <span className="auth-input-icon">🏢</span>
+            <input
+              className="auth-input"
+              placeholder="e.g. crown"
+              value={f.tenant}
+              onChange={set("tenant")}
+            />
+          </div>
+        </div>
+
+        <div className="auth-form-field">
+          <label className="auth-form-label">
+            <span>Staff Employee ID</span>
+            <span style={{ color: "#94a3b8", fontWeight: 500 }}>ID Number</span>
+          </label>
+          <div className="auth-input-wrapper">
+            <span className="auth-input-icon">👤</span>
+            <input
+              className="auth-input"
+              placeholder="1001"
+              value={f.emp_id}
+              onChange={(e) => {
+                set("emp_id")(e);
+                setActiveRole("");
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="auth-form-field">
+          <label className="auth-form-label">
+            <span>Security PIN / Password</span>
+            <span style={{ color: "#94a3b8", fontWeight: 500 }}>Required</span>
+          </label>
+          <div className="auth-input-wrapper">
+            <span className="auth-input-icon">🔒</span>
+            <input
+              type="password"
+              className="auth-input"
+              placeholder="••••••••"
+              value={f.password}
+              onChange={set("password")}
+              onKeyDown={(e) => e.key === "Enter" && go()}
+            />
+          </div>
+        </div>
+
+        {err && (
+          <div style={{
+            background: "var(--rose-light)",
+            border: "1px solid var(--rose-border)",
+            color: "var(--rose)",
+            padding: "0.65rem 0.85rem",
+            borderRadius: "10px",
+            fontSize: "0.85rem",
+            fontWeight: 700,
+            marginBottom: "0.75rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem"
+          }}>
+            <span>⚠</span>
+            <span>{err}</span>
+          </div>
+        )}
+
+        <button
+          className="auth-submit-btn"
+          onClick={go}
+          disabled={loading}
+        >
+          {loading ? "Authenticating..." : "Sign In to Terminal →"}
+        </button>
+
+        <div className="auth-footer">
+          <span>🔒 256-Bit Bank-Grade Encryption</span>
+          <span>·</span>
+          <span>Offline Outbox Ready</span>
+        </div>
       </div>
     </div>
   );

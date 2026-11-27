@@ -18,6 +18,13 @@ def list_inventory(
         apply_postgres_rls(db, u["tid"])
         return get_inventory_summary(db, u["tid"], start_date=start_date, end_date=end_date)
     except Exception as e:
+        err_msg = str(e)
+        if "barcode does not exist" in err_msg or "UndefinedColumn" in err_msg:
+            from app.seed import _ensure_columns
+            _ensure_columns()
+            db.rollback()
+            apply_postgres_rls(db, u["tid"])
+            return get_inventory_summary(db, u["tid"], start_date=start_date, end_date=end_date)
         import logging, traceback
         logging.getLogger("easypos.inventory").error(f"Error in list_inventory: {e}\n{traceback.format_exc()}")
         raise HTTPException(500, detail=f"Inventory error: {str(e)}")
