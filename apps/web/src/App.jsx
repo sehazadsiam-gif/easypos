@@ -7,7 +7,7 @@ import {
   IconFloorPlan, IconReports, IconDineIn, IconTakeaway, IconDelivery,
   IconSearch, IconPrinter, IconCheck, IconAlert, IconClose, IconPlus,
   IconEdit, IconLock, IconUser, IconBuilding, IconDownload, IconBell,
-  IconArrowRight, IconShield, IconCutlery, IconCamera
+  IconArrowRight, IconArrowLeft, IconLogOut, IconShield, IconCutlery, IconCamera
 } from "./Icons";
 
 const api = async (path, token, body, method) => {
@@ -338,7 +338,10 @@ function Pay({ order, token, onDone, isOffline }) {
       {err && <p style={{ color: "var(--red)", fontWeight: 600, margin: "0.6rem 0" }}>{err}</p>}
 
       <div className="row" style={{ marginTop: "1.2rem" }}>
-        <button onClick={onDone}>Back</button>
+        <button className="btn-back" onClick={onDone}>
+          <IconArrowLeft size={15} />
+          <span>Back</span>
+        </button>
         <button className="primary" style={{ padding: "0.75rem 2rem", fontSize: "1.05rem" }} onClick={go}>Complete Payment</button>
       </div>
     </div>
@@ -423,7 +426,10 @@ function VoidRefundModal({ order, token, onClose, onSuccess }) {
       </p>
       {err && <p style={{ color: "var(--red)", fontWeight: 600 }}>{err}</p>}
       <div className="row" style={{ marginTop: "1rem" }}>
-        <button onClick={onClose}>Back</button>
+        <button className="btn-back" onClick={onClose}>
+          <IconArrowLeft size={15} />
+          <span>Cancel</span>
+        </button>
         <button className="warn" onClick={submit}>Authorize {type.toUpperCase()}</button>
       </div>
     </div>
@@ -693,7 +699,10 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
         )}
 
         <div className="row" style={{ marginTop: "1.25rem", gap: "0.6rem" }}>
-          <button onClick={onDone} style={{ flex: 1 }}>Back</button>
+          <button className="btn-back" onClick={onDone} style={{ flex: 0.9, justifyContent: "center" }}>
+            <IconArrowLeft size={15} />
+            <span>Back</span>
+          </button>
           <button className="secondary" onClick={() => submit(false)} style={{ flex: 1.2, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
             <IconPrinter size={15} />
             <span>Send KOT</span>
@@ -1102,11 +1111,16 @@ function TableLayoutEditor({ token, onBack }) {
   return (
     <div className="card" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
       <div className="row">
-        <h2 style={{ margin: 0, color: "var(--blue-primary)" }}>Interactive Table Floor Plan</h2>
-        <div>
-          <button className="secondary" onClick={addTable} style={{ marginRight: "0.5rem" }}>+ Add Table</button>
-          <button className="primary" onClick={save} style={{ marginRight: "0.5rem" }}>Save Layout</button>
-          <button onClick={onBack}>Back</button>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+          <button className="btn-back" onClick={onBack}>
+            <IconArrowLeft size={15} />
+            <span>Dashboard</span>
+          </button>
+          <h2 style={{ margin: 0, color: "var(--blue-primary)" }}>Interactive Table Floor Plan</h2>
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button className="secondary" onClick={addTable}>+ Add Table</button>
+          <button className="primary" onClick={save}>Save Layout</button>
         </div>
       </div>
       <p style={{ color: "var(--gray)", fontSize: "0.9rem" }}>Drag tables to match your restaurant floor plan.</p>
@@ -1181,8 +1195,11 @@ function BarcodeCatalogView({ token, onBack }) {
     <div className="card" style={{ maxWidth: "1280px", margin: "0 auto", padding: "1.5rem" }}>
       <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem", marginBottom: "1.2rem", borderBottom: "1.5px solid var(--line)", paddingBottom: "1rem" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <button onClick={onBack} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>← Back to POS</button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <button className="btn-back" onClick={onBack}>
+              <IconArrowLeft size={15} />
+              <span>Dashboard</span>
+            </button>
             <h2 style={{ margin: 0, color: "var(--brand-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <CrownLogo size={28} /> crownpointofsale Barcode Catalog
             </h2>
@@ -1309,8 +1326,16 @@ export default function App() {
   const [transferTarget, setTransferTarget] = useState(null);
   const [tablesLayout, setTablesLayout] = useState([]);
   const [installPrompt, setInstallPrompt] = useState(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const token = me?.token;
+
+  useEffect(() => {
+    if (!showLogoutConfirm) return;
+    const onKey = (e) => { if (e.key === "Escape") setShowLogoutConfirm(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showLogoutConfirm]);
 
   useEffect(() => {
     const handleBeforeInstall = (e) => {
@@ -1386,6 +1411,27 @@ export default function App() {
 
   const home = () => setView(me?.role === "manager" ? { name: "inventory" } : { name: "home" });
 
+  const canGoBack = view.name !== "home" && !(me?.role === "manager" && view.name === "inventory");
+
+  const goBack = () => {
+    if (view.name === "order" && view.channel) {
+      setView({ name: "layout", channel: view.channel });
+    } else if (view.name === "pay" && view.order?.channel) {
+      setView({ name: "layout", channel: view.order.channel });
+    } else {
+      home();
+    }
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
+    setMe(null);
+    setView({ name: "home" });
+    setShift(null);
+    setOpen([]);
+    setMsg("");
+  };
+
   const openShift = async () => {
     const label = prompt("Shift label (e.g. Morning Shift)", "Shift 1");
     if (!label) return;
@@ -1418,8 +1464,14 @@ export default function App() {
   return (
     <>
       <header>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
-          <div className="brand-badge" onClick={home} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "0.65rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", flexWrap: "wrap" }}>
+          {canGoBack && (
+            <button className="btn-back" onClick={goBack} title="Go back to previous screen">
+              <IconArrowLeft size={16} />
+              <span>Back</span>
+            </button>
+          )}
+          <div className="brand-badge" onClick={home} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "0.65rem" }} title="Return to Dashboard">
             <CrownLogo size={36} />
             <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
               <span style={{ fontSize: "1.25rem", fontWeight: 900, letterSpacing: "-0.035em", background: "linear-gradient(135deg, #1e1b4b 0%, #4338ca 55%, #d97706 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
@@ -1504,11 +1556,41 @@ export default function App() {
               </button>
             )
           )}
-          <button style={{ minHeight: "36px", padding: "0.35rem 0.95rem", color: "var(--ink-muted)" }} onClick={() => setMe(null)}>
-            Log Out
+          <span className="header-divider" aria-hidden="true"></span>
+          <button className="btn-logout" onClick={() => setShowLogoutConfirm(true)} title="Sign out of terminal">
+            <IconLogOut size={15} />
+            <span>Log Out</span>
           </button>
         </div>
       </header>
+
+      {showLogoutConfirm && (
+        <div className="modal-backdrop" onClick={() => setShowLogoutConfirm(false)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-modal-icon">
+              <IconLogOut size={24} />
+            </div>
+            <h3 style={{ margin: "0 0 0.4rem", fontSize: "1.2rem", fontWeight: 800, color: "var(--ink)", letterSpacing: "-0.02em" }}>
+              Sign out of terminal?
+            </h3>
+            <p style={{ margin: "0 0 1.4rem", color: "var(--ink-muted)", fontSize: "0.9rem", lineHeight: 1.5 }}>
+              Signed in as <b style={{ color: "var(--ink)" }}>{me.name}</b>.
+              {shift && me.role !== "manager"
+                ? ` Your active shift (${shift.label}) will remain open until closed.`
+                : " You will be returned to the secure staff sign-in screen."}
+            </p>
+            <div style={{ display: "flex", gap: "0.65rem", justifyContent: "flex-end" }}>
+              <button onClick={() => setShowLogoutConfirm(false)} style={{ minHeight: "40px", padding: "0.5rem 1.15rem" }}>
+                Cancel
+              </button>
+              <button className="danger-solid" onClick={confirmLogout} style={{ minHeight: "40px", padding: "0.5rem 1.25rem", display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
+                <IconLogOut size={15} />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main>
         {msg && (
@@ -1646,11 +1728,14 @@ export default function App() {
 
         {view.name === "layout" && (
           <div>
-            <div className="row" style={{ marginBottom: "1rem" }}>
+            <div className="row" style={{ marginBottom: "1rem", justifyContent: "flex-start", gap: "0.85rem" }}>
+              <button className="btn-back" onClick={home}>
+                <IconArrowLeft size={15} />
+                <span>Dashboard</span>
+              </button>
               <h3 style={{ margin: 0, color: "var(--blue-primary)" }}>
                 {CHANNELS.find(c => c[0] === view.channel)?.[1] || view.channel} Channel
               </h3>
-              <button onClick={home}>Back to Home</button>
             </div>
             <div className="grid">
               {slots.map((s) => {
@@ -1681,7 +1766,7 @@ export default function App() {
             token={token}
             cfg={cfg}
             isOffline={!isOnline}
-            onDone={home}
+            onDone={goBack}
             onPay={(o) => setView({ name: "pay", order: o })}
           />
         )}
@@ -1691,7 +1776,7 @@ export default function App() {
             order={view.order}
             token={token}
             isOffline={!isOnline}
-            onDone={home}
+            onDone={goBack}
           />
         )}
 

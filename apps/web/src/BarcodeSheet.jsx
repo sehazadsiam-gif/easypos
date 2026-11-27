@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
-import { IconPrinter, IconCutlery, IconShoppingBag, IconLayers } from "./Icons";
+import { IconPrinter, IconCutlery, IconShoppingBag, IconLayers, IconArrowLeft } from "./Icons";
 
 export function BarcodeSvg({ value, width = 1.8, height = 48, showText = true }) {
   const svgRef = useRef(null);
@@ -109,21 +109,28 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
       {/* Interactive Toolbar (Hidden during Print) */}
       <div className="no-print" style={{ borderBottom: "2px solid #e2e8f0", paddingBottom: "1.25rem", marginBottom: "1.5rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
-          <div>
-            <h2 style={{ margin: 0, color: "var(--brand-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <IconPrinter size={22} />
-              <span>Organized Barcode Printing Sheets</span>
-            </h2>
-            <p style={{ margin: "4px 0 0", color: "var(--ink-muted)", fontSize: "0.88rem" }}>
-              Organized by departments and menu categories. Formatted for standard A4 sticker paper (3 columns) or reference cards.
-            </p>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "0.85rem", flexWrap: "wrap" }}>
+            {onBack && (
+              <button className="btn-back" onClick={onBack} style={{ marginTop: "2px" }}>
+                <IconArrowLeft size={15} />
+                <span>Back</span>
+              </button>
+            )}
+            <div>
+              <h2 style={{ margin: 0, color: "var(--brand-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <IconPrinter size={22} />
+                <span>Organized Barcode Printing Sheets</span>
+              </h2>
+              <p style={{ margin: "4px 0 0", color: "var(--ink-muted)", fontSize: "0.88rem" }}>
+                Organized by departments and menu categories. Formatted for standard A4 sticker paper (3 columns) or reference cards.
+              </p>
+            </div>
           </div>
           <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
             <button className="primary" onClick={() => window.print()} style={{ fontWeight: 700, padding: "0.5rem 1.25rem", fontSize: "0.95rem", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
               <IconPrinter size={16} />
               <span>Print Selected Sheets</span>
             </button>
-            {onBack && <button onClick={onBack} style={{ padding: "0.5rem 1rem" }}>← Back</button>}
           </div>
         </div>
 

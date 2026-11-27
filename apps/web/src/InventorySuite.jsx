@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { PrintableBarcodeSheet, BarcodeSvg } from "./BarcodeSheet";
-import { IconAlert, IconClose, IconCheck, IconEdit, IconPlus, IconPrinter, IconSearch } from "./Icons";
+import { IconAlert, IconClose, IconCheck, IconEdit, IconPlus, IconPrinter, IconSearch, IconArrowLeft } from "./Icons";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -1614,9 +1614,14 @@ export function InventorySuite({ token, api, userRole, onBack }) {
 
   return (
     <div>
-      <div className="row" style={{ marginBottom: "1rem" }}>
+      <div className="row" style={{ marginBottom: "1rem", justifyContent: "flex-start", gap: "0.85rem" }}>
+        {userRole !== "manager" && (
+          <button className="btn-back" onClick={onBack}>
+            <IconArrowLeft size={15} />
+            <span>Dashboard</span>
+          </button>
+        )}
         <h2 style={{ margin: 0, color: "var(--blue-primary)" }}>Barcode Inventory & Recipes</h2>
-        {userRole !== "manager" && <button onClick={onBack}>Back to POS</button>}
       </div>
 
       <div className="nav-tabs">

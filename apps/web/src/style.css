@@ -183,6 +183,120 @@ button.warn:hover {
   border-color: var(--rose);
 }
 
+/* Tactile Back Navigation Button */
+button.btn-back {
+  background: #ffffff;
+  color: var(--ink);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 0.4rem 1rem 0.4rem 0.8rem;
+  min-height: 36px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+button.btn-back svg {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--brand-primary);
+}
+button.btn-back:hover {
+  background: var(--brand-light);
+  border-color: #c7d2fe;
+  color: var(--brand-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+}
+button.btn-back:hover svg {
+  transform: translateX(-3px);
+}
+
+/* Safe, High-Contrast Log Out Button */
+button.btn-logout {
+  background: #ffffff;
+  color: #475569;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 0.4rem 1rem;
+  min-height: 36px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  box-shadow: var(--shadow-sm);
+}
+button.btn-logout svg {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+button.btn-logout:hover {
+  background: var(--rose-light);
+  color: var(--rose);
+  border-color: var(--rose-border);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.14);
+}
+button.btn-logout:hover svg {
+  transform: translateX(2px);
+}
+
+.header-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--line);
+  display: inline-block;
+  margin: 0 0.1rem;
+}
+
+/* Enterprise Confirmation Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease-out;
+}
+.confirm-modal {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 400px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.28);
+  animation: popIn 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.confirm-modal-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--rose-light);
+  color: var(--rose);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+button.danger-solid {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.3);
+}
+button.danger-solid:hover {
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+  box-shadow: 0 6px 18px rgba(225, 29, 72, 0.42);
+  transform: translateY(-1.5px);
+}
+
 /* Text Inputs & Selects */
 input, select, textarea {
   padding: 0.65rem 0.95rem;
