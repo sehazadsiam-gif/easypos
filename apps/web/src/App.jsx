@@ -18,6 +18,58 @@ const api = async (path, token, body, method) => {
 };
 
 const tk = (p) => (p != null && p > 0 ? "৳" + (p / 100).toFixed(2) : "Needs Price");
+
+export function CrownLogo({ size = 34, style = {} }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: "inline-block", verticalAlign: "middle", flexShrink: 0, ...style }}
+    >
+      <defs>
+        <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#1e1b4b" />
+          <stop offset="45%" stopColor="#312e81" />
+          <stop offset="100%" stopColor="#4338ca" />
+        </linearGradient>
+        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#fef08a" />
+          <stop offset="35%" stopColor="#fbbf24" />
+          <stop offset="70%" stopColor="#f59e0b" />
+          <stop offset="100%" stopColor="#b45309" />
+        </linearGradient>
+        <linearGradient id="goldRim" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.9" />
+          <stop offset="60%" stopColor="#818cf8" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.2" />
+        </linearGradient>
+        <linearGradient id="peakJewelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#fde047" />
+        </linearGradient>
+        <filter id="crownGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#f59e0b" floodOpacity="0.4" />
+        </filter>
+      </defs>
+      <rect x="3" y="3" width="58" height="58" rx="16" fill="url(#shieldGrad)" stroke="url(#goldRim)" strokeWidth="2" />
+      <g filter="url(#crownGlow)">
+        <path d="M16 42L19 25L25 31L32 18L39 31L45 25L48 42H16Z" fill="url(#goldGrad)" />
+        <rect x="16" y="44" width="32" height="4" rx="2" fill="url(#goldGrad)" />
+        <circle cx="22" cy="46" r="1.3" fill="#ffffff" />
+        <circle cx="32" cy="46" r="1.5" fill="#ffffff" />
+        <circle cx="42" cy="46" r="1.3" fill="#ffffff" />
+        <circle cx="32" cy="17" r="2.2" fill="url(#peakJewelGrad)" stroke="#b45309" strokeWidth="0.8" />
+        <circle cx="19" cy="24" r="1.5" fill="#fef08a" />
+        <circle cx="45" cy="24" r="1.5" fill="#fef08a" />
+        <polygon points="32,12 33.5,15.5 37,16 34,18.5 35,22 32,19.5 29,22 30,18.5 27,16 30.5,15.5" fill="#ffffff" opacity="0.9" />
+      </g>
+    </svg>
+  );
+}
+
 const CHANNELS = [
   ["dine_in", "Dine In"],
   ["takeaway", "Takeaway"],
@@ -39,9 +91,14 @@ function Login({ onLogin }) {
   };
   return (
     <div className="login card">
-      <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
-        <h1 style={{ color: "var(--blue-primary)", margin: 0, fontSize: "1.75rem", letterSpacing: "-0.03em" }}>crownpointofsale</h1>
-        <p style={{ color: "var(--gray)", fontSize: "0.88rem", margin: "0.3rem 0 0" }}>Enterprise Cloud Point of Sale</p>
+      <div style={{ textAlign: "center", marginBottom: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <CrownLogo size={58} style={{ marginBottom: "0.6rem", filter: "drop-shadow(0 6px 16px rgba(67, 56, 202, 0.35))" }} />
+        <h1 style={{ margin: 0, fontSize: "1.85rem", fontWeight: 900, letterSpacing: "-0.035em", background: "linear-gradient(135deg, #1e1b4b 0%, #4338ca 60%, #d97706 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+          crownpointofsale
+        </h1>
+        <p style={{ color: "var(--ink-muted)", fontSize: "0.85rem", fontWeight: 600, letterSpacing: "0.02em", margin: "0.35rem 0 0" }}>
+          Enterprise Cloud Point of Sale
+        </p>
       </div>
       <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray)" }}>Business Code</label>
       <input placeholder="crown" value={f.tenant} onChange={set("tenant")} />
@@ -996,7 +1053,9 @@ function BarcodeCatalogView({ token, onBack }) {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
             <button onClick={onBack} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>← Back to POS</button>
-            <h2 style={{ margin: 0, color: "var(--brand-primary)" }}>🏷️ Crown Coffee Barcode Catalog</h2>
+            <h2 style={{ margin: 0, color: "var(--brand-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <CrownLogo size={28} /> crownpointofsale Barcode Catalog
+            </h2>
           </div>
           <p style={{ margin: "6px 0 0", color: "var(--ink-muted)", fontSize: "0.9rem" }}>
             Total <b>{dishes.length} Menu Dishes</b> (<code>MENU-</code>) and <b>{ingredients.length} Bazar Ingredients</b> (<code>ING-</code>). Scannable with any standard USB barcode scanner.
@@ -1199,7 +1258,17 @@ export default function App() {
     <>
       <header>
         <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
-          <span className="brand-badge" onClick={home} style={{ cursor: "pointer" }}>👑 Crown Coffee POS</span>
+          <div className="brand-badge" onClick={home} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "0.65rem" }}>
+            <CrownLogo size={36} />
+            <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
+              <span style={{ fontSize: "1.25rem", fontWeight: 900, letterSpacing: "-0.035em", background: "linear-gradient(135deg, #1e1b4b 0%, #4338ca 55%, #d97706 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                crownpointofsale
+              </span>
+              <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-muted)", marginTop: "2px" }}>
+                Cloud POS
+              </span>
+            </div>
+          </div>
           <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)", fontWeight: 600, background: "var(--paper-subtle)", padding: "3px 8px", borderRadius: "999px" }}>
             📍 {me.branch || "Uttara"}
           </span>
