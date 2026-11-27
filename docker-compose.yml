@@ -25,9 +25,6 @@ services:
       - SERVICE_FQDN_WEB
     volumes:
       - webdist:/usr/share/nginx/html
-    ports:
-      - "${PORT:-80}:80"
-      - "3000:80"
     expose:
       - "80"
 
@@ -47,8 +44,6 @@ services:
       STATIC_DIR: /app/static
     volumes:
       - webdist:/app/static:ro
-    ports:
-      - "8000:8000"
     expose:
       - "8000"
 
