@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { PrintableBarcodeSheet, BarcodeSvg } from "./BarcodeSheet";
-import { IconAlert, IconClose, IconCheck, IconEdit, IconPlus, IconPrinter, IconSearch, IconArrowLeft, IconLock } from "./Icons";
+import { CameraScannerModal } from "./CameraScanner";
+import { IconAlert, IconClose, IconCheck, IconEdit, IconPlus, IconPrinter, IconSearch, IconArrowLeft, IconLock, IconCamera } from "./Icons";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -145,6 +146,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
   const [msg, setMsg] = useState({ text: "", type: "info" });
   const [editApprovedMode, setEditApprovedMode] = useState(false);
   const [showOwnerAuth, setShowOwnerAuth] = useState(false);
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
   const scanRef = useRef(null);
 
   const refocusScan = () => {
@@ -531,7 +533,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                 CODE-128
               </span>
             </div>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
               <input
                 ref={scanRef}
                 autoFocus
@@ -542,8 +544,8 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                     : "Scan or type BAZAR barcode (e.g. ING-CHICKEN-THI-G) or QTY-X5..."
                 }
                 style={{
-                  flex: 1,
-                  fontSize: "1.1rem",
+                  flex: "1 1 220px",
+                  fontSize: "1.05rem",
                   padding: "0.85rem 1rem",
                   borderRadius: "8px",
                 }}
@@ -552,8 +554,18 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                 onKeyDown={(e) => e.key === "Enter" && handleScan(scanInput)}
               />
               <button
+                className="secondary"
+                style={{ minHeight: "48px", padding: "0 1.15rem", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
+                disabled={isLocked}
+                onClick={() => setShowCameraScanner(true)}
+                title="Scan barcode using device camera"
+              >
+                <IconCamera size={18} />
+                <span>Camera Scan</span>
+              </button>
+              <button
                 className="primary"
-                style={{ minHeight: "48px", padding: "0 1.5rem", fontWeight: 700 }}
+                style={{ minHeight: "48px", padding: "0 1.4rem", fontWeight: 700 }}
                 disabled={isLocked}
                 onClick={() => handleScan(scanInput)}
               >
@@ -561,6 +573,25 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
               </button>
             </div>
           </div>
+
+          {showCameraScanner && (
+            <CameraScannerModal
+              title={
+                isSale
+                  ? "Scan Menu Barcode (Daily Sale)"
+                  : batchType === "central"
+                  ? "Scan Ingredient (Monthly Opening Stock)"
+                  : "Scan Ingredient (Daily Bazar)"
+              }
+              subtitle="Align the barcode inside the frame — supports continuous scanning"
+              continuous={true}
+              onScan={(code) => handleScan(code)}
+              onClose={() => {
+                setShowCameraScanner(false);
+                refocusScan();
+              }}
+            />
+          )}
 
           <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Qty Codes:</span>

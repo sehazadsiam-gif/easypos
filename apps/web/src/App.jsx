@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getOutbox, queueOutbox, flushOutbox } from "./outbox";
 import { PrintableBarcodeSheet, BarcodeSvg } from "./BarcodeSheet";
 import { InventorySuite } from "./InventorySuite";
+import { CameraScannerModal } from "./CameraScanner";
 import {
   IconCrown, IconLocation, IconSync, IconBarcode, IconInventory,
   IconFloorPlan, IconReports, IconDineIn, IconTakeaway, IconDelivery,
@@ -443,6 +444,7 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
   const [cart, setCart] = useState({});
   const [waiter, setWaiter] = useState("");
   const [err, setErr] = useState("");
+  const [showOrderCamera, setShowOrderCamera] = useState(false);
 
   useEffect(() => {
     api("/items", token).then(setItems).catch(() => {});
@@ -524,10 +526,38 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
               </button>
             )}
           </div>
+          <button
+            className="secondary"
+            onClick={() => setShowOrderCamera(true)}
+            style={{ borderRadius: "999px", padding: "0.45rem 1rem", minHeight: "40px", display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
+            title="Scan menu barcode with camera"
+          >
+            <IconCamera size={16} />
+            <span>Camera Scan</span>
+          </button>
           <div style={{ fontSize: "0.85rem", color: "var(--ink-muted)", fontWeight: 600 }}>
             Showing <b>{filteredItems.length}</b> of {items.length} items
           </div>
         </div>
+
+        {showOrderCamera && (
+          <CameraScannerModal
+            title="Scan Menu Item Barcode"
+            subtitle="Point camera at a MENU barcode to add directly to the order cart"
+            continuous={true}
+            onScan={(code) => {
+              const clean = code.trim().toUpperCase();
+              const matched = items.find((it) => it.barcode && it.barcode.toUpperCase() === clean);
+              if (matched) {
+                add(matched);
+                setErr("");
+              } else {
+                setErr(`No menu item found for barcode: ${clean}`);
+              }
+            }}
+            onClose={() => setShowOrderCamera(false)}
+          />
+        )}
 
         {/* Category Pills */}
         <div className="nav-tabs" style={{ marginBottom: "1.2rem" }}>
@@ -727,6 +757,7 @@ function InventoryDailyBazarView({ token, onBack }) {
   const [cost, setCost] = useState("");
   const [wasteReason, setWasteReason] = useState("");
   const [barcodeScan, setBarcodeScan] = useState("");
+  const [showLegacyCamera, setShowLegacyCamera] = useState(false);
   const [scannedCart, setScannedCart] = useState([]);
   const [tripName, setTripName] = useState("Morning Bazar Trip");
   const [shopperName, setShopperName] = useState("Staff");
@@ -883,16 +914,29 @@ function InventoryDailyBazarView({ token, onBack }) {
               <p style={{ color: "var(--gray)", fontSize: "0.85rem", margin: "0 0 0.5rem 0" }}>
                 Auto-focus active. Trigger your handheld barcode gun on ingredient packages or use modifier codes.
               </p>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                 <input
                   placeholder="Scan barcode or type ING-MILK-1L / QTY-X5"
-                  style={{ flex: 1, fontSize: "1.05rem", padding: "0.65rem", border: "2px solid var(--blue-primary)", borderRadius: "6px" }}
+                  style={{ flex: "1 1 200px", fontSize: "1.05rem", padding: "0.65rem", border: "2px solid var(--blue-primary)", borderRadius: "6px" }}
                   value={barcodeScan}
                   onChange={e => setBarcodeScan(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleBarcodeScan(barcodeScan)}
                 />
+                <button className="secondary" onClick={() => setShowLegacyCamera(true)} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                  <IconCamera size={16} />
+                  <span>Camera</span>
+                </button>
                 <button className="primary" onClick={() => handleBarcodeScan(barcodeScan)}>Enter</button>
               </div>
+              {showLegacyCamera && (
+                <CameraScannerModal
+                  title="Camera Barcode Scanner"
+                  subtitle="Scan ingredient or modifier barcodes directly into the trip cart"
+                  continuous={true}
+                  onScan={(code) => handleBarcodeScan(code)}
+                  onClose={() => setShowLegacyCamera(false)}
+                />
+              )}
 
               <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
                 <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Quick Modifiers:</span>
