@@ -1,47 +1,11 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e1b4b" />
-      <stop offset="45%" stop-color="#312e81" />
-      <stop offset="100%" stop-color="#4338ca" />
-    </linearGradient>
-    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fef08a" />
-      <stop offset="35%" stop-color="#fbbf24" />
-      <stop offset="70%" stop-color="#f59e0b" />
-      <stop offset="100%" stop-color="#b45309" />
-    </linearGradient>
-    <linearGradient id="goldRim" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.9" />
-      <stop offset="60%" stop-color="#818cf8" stop-opacity="0.4" />
-      <stop offset="100%" stop-color="#4f46e5" stop-opacity="0.2" />
-    </linearGradient>
-    <linearGradient id="peakJewelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" />
-      <stop offset="100%" stop-color="#fde047" />
-    </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#f59e0b" flood-opacity="0.4" />
-    </filter>
-  </defs>
-  <!-- Polished Shield / Squircle -->
-  <rect x="3" y="3" width="58" height="58" rx="16" fill="url(#shieldGrad)" stroke="url(#goldRim)" stroke-width="2" />
+  <!-- Main Body: Dark Navy Blue (#1C274C) -->
+  <path d="M15 54C12.7909 54 11 52.2091 11 50V44C11 41.7909 12.7909 40 15 40H15.4L13.1 25.1C12.7 22.4 15.3 20.3 17.8 21.6L25.3 25.5C26.2 26 27.3 25.7 27.9 24.8L30.8 20.3C31.4 19.4 32.6 19.4 33.2 20.3L36.1 24.8C36.7 25.7 37.8 26 38.7 25.5L46.2 21.6C48.7 20.3 51.3 22.4 50.9 25.1L48.6 40H49C51.2091 40 53 41.7909 53 44V50C53 52.2091 51.2091 54 49 54H15Z" fill="#1C274C" />
   
-  <!-- Royal Crown Emblem -->
-  <g filter="url(#glow)">
-    <!-- Crown Body -->
-    <path d="M16 42L19 25L25 31L32 18L39 31L45 25L48 42H16Z" fill="url(#goldGrad)" />
-    <!-- Crown Base Band -->
-    <rect x="16" y="44" width="32" height="4" rx="2" fill="url(#goldGrad)" />
-    <!-- Base Jewels -->
-    <circle cx="22" cy="46" r="1.3" fill="#ffffff" />
-    <circle cx="32" cy="46" r="1.5" fill="#ffffff" />
-    <circle cx="42" cy="46" r="1.3" fill="#ffffff" />
-    <!-- Peak Jewels -->
-    <circle cx="32" cy="17" r="2.2" fill="url(#peakJewelGrad)" stroke="#b45309" stroke-width="0.8" />
-    <circle cx="19" cy="24" r="1.5" fill="#fef08a" />
-    <circle cx="45" cy="24" r="1.5" fill="#fef08a" />
-    <!-- Accent Star / Diamond at Center Peak -->
-    <polygon points="32,12 33.5,15.5 37,16 34,18.5 35,22 32,19.5 29,22 30,18.5 27,16 30.5,15.5" fill="#ffffff" opacity="0.9" />
-  </g>
+  <!-- Secondary / Accent Shapes: Muted Light Grey (#8D93A5) -->
+  <circle cx="16" cy="15" r="3.5" fill="#8D93A5" />
+  <circle cx="32" cy="12" r="4.5" fill="#8D93A5" />
+  <circle cx="48" cy="15" r="3.5" fill="#8D93A5" />
+  <rect x="21" y="30" width="22" height="9" rx="3" fill="#8D93A5" />
+  <rect x="18" y="46" width="28" height="3.5" rx="1.75" fill="#8D93A5" />
 </svg>
