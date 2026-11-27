@@ -1351,7 +1351,7 @@ export default function App() {
                 <span style={{ fontSize: "1.8rem" }}>📦</span>
                 <div>
                   <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>Inventory & Stock</div>
-                  <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Daily Bazar, Central & Ledger</span>
+                  <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Daily Bazar, Monthly Opening Stock & Ledger</span>
                 </div>
               </button>
 

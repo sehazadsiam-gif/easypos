@@ -320,7 +320,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
       setMsg({ text: "Scan at least one item before approving.", type: "error" });
       return;
     }
-    const label = batchType === "central" ? "Central Inventory" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale";
+    const label = batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale";
     if (!window.confirm(`Confirm APPROVE ${label} Batch #${activeBatch.id}? Approved batches cannot be edited or deleted.`)) {
       refocusScan();
       return;
@@ -350,7 +350,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
           <div className="row" style={{ marginBottom: "0.75rem", flexWrap: "wrap" }}>
             <div>
               <h3 style={{ margin: 0, color: "var(--blue-primary)" }}>
-                {batchType === "central" && "Central Inventory (Starting Stock)"}
+                {batchType === "central" && "Monthly Opening Stock (Starting Count)"}
                 {batchType === "bazar" && "Daily Bazar (Purchases)"}
                 {batchType === "sale" && "Daily Sale (Menu Deductions)"}
               </h3>
@@ -1452,7 +1452,7 @@ function InventoryOverviewView({ token, api, userRole }) {
           <thead>
             <tr>
               <th>Bazar Item</th>
-              <th>Central</th>
+              <th>Monthly Opening Stock</th>
               <th>Bazar</th>
               <th>Sale</th>
               <th>Current Stock</th>
@@ -1546,7 +1546,7 @@ function InventoryOverviewView({ token, api, userRole }) {
             </select>
             <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
               <option value="">All Types</option>
-              <option value="central">Central</option>
+              <option value="central">Monthly Opening Stock</option>
               <option value="bazar">Bazar</option>
               <option value="sale">Sale</option>
               <option value="reversal">Reversal</option>
@@ -1616,7 +1616,7 @@ export function InventorySuite({ token, api, userRole, onBack }) {
       </div>
 
       <div className="nav-tabs">
-        <button className={tab === "central" ? "active" : ""} onClick={() => setTab("central")}>Central Inventory</button>
+        <button className={tab === "central" ? "active" : ""} onClick={() => setTab("central")}>Monthly Opening Stock</button>
         <button className={tab === "bazar" ? "active" : ""} onClick={() => setTab("bazar")}>Daily Bazar</button>
         <button className={tab === "sale" ? "active" : ""} onClick={() => setTab("sale")}>Daily Sale</button>
         <button className={tab === "recipes" ? "active" : ""} onClick={() => setTab("recipes")}>Recipes</button>

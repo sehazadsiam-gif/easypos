@@ -526,3 +526,56 @@ table.data-table tbody tr:last-child td {
   animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   border-left: 4px solid var(--brand-primary);
 }
+
+/* ==========================================================================
+   Print Styles (A4 Sheet Barcode Optimization)
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 8mm 8mm 8mm;
+  }
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 10pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  #root {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .no-print, header, nav, .toast-msg, button, .nav-tabs {
+    display: none !important;
+  }
+  .print-only-header {
+    display: block !important;
+  }
+  .card {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+  .barcode-print-container {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .barcode-label-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    border: 1px solid #475569 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+  .barcode-category-header {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
