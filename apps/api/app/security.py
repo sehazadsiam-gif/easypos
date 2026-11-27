@@ -1,8 +1,34 @@
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError, VerificationError
-import secrets, hashlib, hmac
+import secrets, hashlib, hmac, time
+from collections import defaultdict
 
 ph = PasswordHasher()
+
+# In-memory sliding-window rate limiter
+_attempts = defaultdict(list)
+
+def check_rate_limit(key: str, max_attempts: int = 5, window_seconds: int = 60) -> bool:
+    """
+    Returns True if allowed, False if rate limit exceeded.
+    Prunes attempts older than window_seconds.
+    """
+    now = time.time()
+    cutoff = now - window_seconds
+    _attempts[key] = [t for t in _attempts[key] if t > cutoff]
+    if len(_attempts[key]) >= max_attempts:
+        return False
+    _attempts[key].append(now)
+    return True
+
+def record_failed_attempt(key: str):
+    """Explicitly count a failed attempt."""
+    _attempts[key].append(time.time())
+
+def clear_rate_limit(key: str):
+    """Clear rate limit on successful authentication."""
+    if key in _attempts:
+        del _attempts[key]
 
 def hp(pw: str) -> str:
     """Hash password using Argon2id with salt."""

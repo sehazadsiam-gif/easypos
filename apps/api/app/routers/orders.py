@@ -3,6 +3,7 @@ from app.database import now, VAT, SVC
 from app.dependencies import get_db, auth, apply_postgres_rls
 from app.models import Order, Line, Payment, Item, User, VoidRefund
 from app.schemas import OrderIn, PayIn, VoidRefundIn, TableTransferIn
+from app.security import check_rate_limit, record_failed_attempt, clear_rate_limit
 from app.services.pos_service import deduct_inventory_for_order, generate_print_jobs
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -136,6 +137,10 @@ def void_or_refund(b: VoidRefundIn, u=Depends(auth), db=Depends(get_db)):
     if not o or o.tenant_id != u["tid"]:
         raise HTTPException(404, "Order not found")
     
+    rate_key = f"pin:{u['tid']}:{u['uid']}"
+    if not check_rate_limit(rate_key, max_attempts=5, window_seconds=60):
+        raise HTTPException(429, "Too many failed PIN attempts. Please wait 1 minute.")
+
     managers = db.query(User).filter(
         User.tenant_id == u["tid"],
         User.role.in_(["owner", "manager"])
@@ -146,7 +151,9 @@ def void_or_refund(b: VoidRefundIn, u=Depends(auth), db=Depends(get_db)):
             approver = m
             break
     if not approver:
+        record_failed_attempt(rate_key)
         raise HTTPException(403, "Invalid manager approval PIN")
+    clear_rate_limit(rate_key)
 
     if b.type == "void":
         if o.status == "paid":

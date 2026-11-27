@@ -13,8 +13,11 @@ def get_db():
 def auth(authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Not logged in")
+    token = authorization.split()[1]
     try:
-        return jwt.decode(authorization.split()[1], SECRET, algorithms=["HS256"])
+        return jwt.decode(token, SECRET, algorithms=["HS256"], options={"verify_exp": True})
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
     except Exception:
         raise HTTPException(401, "Invalid token")
 
@@ -32,6 +35,7 @@ def apply_postgres_rls(db, tenant_id: int):
     """
     try:
         from sqlalchemy import text
-        db.execute(text(f"SET LOCAL app.current_tenant_id = '{tenant_id}';"))
+        tid = int(tenant_id)
+        db.execute(text(f"SET LOCAL app.current_tenant_id = '{tid}';"))
     except Exception:
         pass

@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import VAT, SVC
@@ -6,15 +7,45 @@ from app.routers import auth, items, shifts, orders, reports, inventory, managem
 
 app = FastAPI(title="Crown Point of Sale API", version="2.1.0")
 
+# Security-hardened CORS configuration
+cors_env = os.getenv("CORS_ORIGINS", "")
+allowed_origins = [
+    "https://crownpointofsale.online",
+    "http://crownpointofsale.online",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173"
+]
+if cors_env:
+    for origin in cors_env.split(","):
+        o = origin.strip()
+        if o and o not in allowed_origins:
+            allowed_origins.append(o)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
 seed()
+
+@app.get("/")
+def root():
+    return {
+        "app": "Crown Point of Sale API",
+        "status": "healthy",
+        "version": "2.1.0",
+        "endpoints": {
+            "config": "/config",
+            "docs": "/docs",
+            "auth": "/auth/login",
+            "items": "/items"
+        }
+    }
 
 @app.get("/config")
 def config():
