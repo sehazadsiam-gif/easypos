@@ -34,8 +34,9 @@ def sync_outbox(b: SyncBatchIn, u=Depends(auth), db=Depends(get_db)):
                     qty = l.get("qty", 1)
                     item_obj = db.get(Item, item_id)
                     if item_obj and item_obj.tenant_id == t and qty > 0:
-                        sub += item_obj.price * qty
-                        lines.append(Line(tenant_id=t, item_id=item_obj.id, name=item_obj.name, qty=qty, unit_price=item_obj.price, station=item_obj.station))
+                        price = item_obj.price or 0
+                        sub += price * qty
+                        lines.append(Line(tenant_id=t, item_id=item_obj.id, name=item_obj.name, qty=qty, unit_price=price, station=item_obj.station))
                 if not lines:
                     results.append({"client_uuid": uuid, "status": "error", "error": "Empty or invalid items"})
                     continue

@@ -53,8 +53,9 @@ def create_order(b: OrderIn, u=Depends(auth), db=Depends(get_db)):
         it = db.get(Item, l.item_id)
         if not it or it.tenant_id != t or l.qty < 1:
             raise HTTPException(400, "Bad item")
-        sub += it.price * l.qty
-        lines.append(Line(tenant_id=t, item_id=it.id, name=it.name, qty=l.qty, unit_price=it.price, station=it.station))
+        price = it.price or 0
+        sub += price * l.qty
+        lines.append(Line(tenant_id=t, item_id=it.id, name=it.name, qty=l.qty, unit_price=price, station=it.station))
     if not lines:
         raise HTTPException(400, "Empty order")
     
