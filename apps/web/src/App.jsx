@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { getOutbox, queueOutbox, flushOutbox } from "./outbox";
-import { PracticeBazarView } from "./PracticeBazar";
 import { PrintableBarcodeSheet } from "./BarcodeSheet";
 import { InventorySuite } from "./InventorySuite";
 
@@ -60,21 +59,9 @@ function Login({ onLogin }) {
       />
       {err && <div style={{ color: "var(--red)", fontWeight: 600, fontSize: "0.9rem" }}>{err}</div>}
       <button className="primary" style={{ marginTop: "0.5rem", minHeight: "46px" }} onClick={go}>Sign In to Terminal</button>
-      
-      <div style={{ textAlign: "center", margin: "0.5rem 0" }}>
-        <button 
-          type="button" 
-          className="secondary" 
-          style={{ width: "100%", minHeight: "42px", fontWeight: 700 }} 
-          onClick={() => onLogin({ publicPractice: true })}
-        >
-          🛒 Open Daily Bazar (Practice Sandbox Mode)
-        </button>
-        <small style={{ color: "var(--gray)", fontSize: "0.78rem" }}>Public training sandbox · No login or PIN required</small>
-      </div>
 
-      <div style={{ background: "var(--blue-light)", padding: "0.6rem 0.8rem", borderRadius: "8px", fontSize: "0.78rem", color: "var(--blue-primary)", marginTop: "0.5rem" }}>
-        Demo Accounts: <b>1001</b> (Owner), <b>1002</b> (Manager), <b>1003</b> (Cashier) | Password: <b>admin123</b>
+      <div style={{ background: "var(--blue-light)", padding: "0.6rem 0.8rem", borderRadius: "8px", fontSize: "0.78rem", color: "var(--blue-primary)", marginTop: "0.75rem" }}>
+        Staff Logins: <b>1001</b> (Owner), <b>1002</b> (Manager), <b>1003</b> (Cashier) | Password: <b>admin123</b>
       </div>
     </div>
   );
@@ -1003,7 +990,6 @@ export default function App() {
   }, [token, view.name]);
 
   if (!me) return <Login onLogin={setMe} />;
-  if (me.publicPractice) return <PracticeBazarView onExitToPOS={() => setMe(null)} />;
 
   const home = () => setView({ name: "home" });
 
@@ -1055,9 +1041,6 @@ export default function App() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", flexWrap: "wrap" }}>
-          <button className="secondary" style={{ minHeight: "36px", padding: "0.35rem 0.95rem", fontWeight: 700 }} onClick={() => setView({ name: "practice_bazar" })}>
-            🛒 Practice Sandbox
-          </button>
           <span style={{ fontSize: "0.88rem", background: "var(--paper-subtle)", padding: "0.3rem 0.75rem", borderRadius: "8px" }}>
             {shift ? (
               <span style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
@@ -1250,7 +1233,6 @@ export default function App() {
         )}
 
         {view.name === "inventory" && <InventorySuite token={token} api={api} userRole={me.role} onBack={home} />}
-        {view.name === "practice_bazar" && <PracticeBazarView onExitToPOS={home} />}
         {view.name === "table_editor" && <TableLayoutEditor token={token} onBack={home} />}
       </main>
     </>

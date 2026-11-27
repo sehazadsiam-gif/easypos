@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import VAT, SVC
 from app.seed import seed
-from app.routers import auth, items, shifts, orders, reports, inventory, management, sync, realtime, practice_bazar, recipes, batches
+from app.routers import auth, items, shifts, orders, reports, inventory, management, sync, realtime, recipes, batches
 
 app = FastAPI(title="Crown Point of Sale API", version="2.1.0")
 
@@ -35,7 +35,6 @@ app.include_router(reports.router)
 app.include_router(inventory.router)
 app.include_router(recipes.router)
 app.include_router(batches.router)
-app.include_router(practice_bazar.router)  # Public practice sandbox
 app.include_router(management.router)
 app.include_router(sync.router)
 app.include_router(realtime.router)

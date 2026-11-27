@@ -4,7 +4,7 @@ from sqlalchemy import text
 from app.database import Base, engine, Session
 from app.models import (
     Tenant, Branch, Terminal, User, Item, Ingredient,
-    Recipe, RecipeItem, TableLayout, PracticeItem,
+    Recipe, RecipeItem, TableLayout,
     InventoryBatch, InventoryBatchLine, StockLedger,
 )
 from app.security import hp
@@ -193,31 +193,6 @@ def seed():
             ]
             db.add(TableLayout(tenant_id=t.id, channel="dine_in", layout_json=json.dumps(default_layout)))
 
-        if not db.query(PracticeItem).first():
-            sample_practice = [
-                ("ITEM-MILK", "Fresh Full Cream Milk", "Dairy", "ml", 1000, "1 litre", 10000, 20000, 10000),
-                ("ITEM-COFFEE-BEANS", "Espresso Coffee Beans", "Beverages", "g", 1000, "1 kg", 3000, 10000, 250000),
-                ("ITEM-CHEESE", "Cheddar Cheese Block", "Dairy", "g", 500, "500 gram", 2000, 5000, 65000),
-                ("ITEM-BURGER-BUN", "Sesame Burger Buns", "Bakery", "pcs", 12, "12 pcs", 24, 60, 28000),
-                ("ITEM-CHICKEN", "Chicken Patty Pack", "Meat", "pcs", 10, "10 pcs", 30, 80, 85000),
-                ("ITEM-POTATO", "French Fry Potatoes", "Produce", "g", 5000, "5 kg", 15000, 40000, 30000),
-                ("ITEM-SUGAR", "White Sugar Bag", "Dry Goods", "g", 1000, "1 kg", 5000, 15000, 14000),
-                ("ITEM-TEA", "Black Tea Leaves", "Beverages", "g", 500, "500 gram", 1500, 4000, 35000),
-                ("ITEM-BUTTER", "Salted Butter Block", "Dairy", "g", 200, "200 gram", 800, 2000, 32000),
-                ("ITEM-SAUCE", "Tomato Ketchup Gallon", "Condiments", "g", 2000, "2 kg", 4000, 10000, 55000)
-            ]
-            for barcode, name, cat, unit, psize, punit, stock, par, cost in sample_practice:
-                db.add(PracticeItem(
-                    barcode=barcode,
-                    name=name,
-                    category=cat,
-                    base_unit=unit,
-                    pack_size=psize,
-                    pack_unit=punit,
-                    current_stock=stock,
-                    par_level=par,
-                    default_cost=cost
-                ))
         db.commit()
     finally:
         db.close()
