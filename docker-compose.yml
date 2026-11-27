@@ -21,6 +21,10 @@ services:
     restart: always
     depends_on:
       - api
+    environment:
+      - SERVICE_FQDN_WEB
+    volumes:
+      - webdist:/usr/share/nginx/html
     ports:
       - "${PORT:-80}:80"
       - "3000:80"
@@ -40,6 +44,14 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-in-production}
       VAT_PCT: ${VAT_PCT:-5}
       SERVICE_PCT: ${SERVICE_PCT:-10}
+      STATIC_DIR: /app/static
+    volumes:
+      - webdist:/app/static:ro
+    ports:
+      - "8000:8000"
+    expose:
+      - "8000"
 
 volumes:
   pgdata:
+  webdist:
