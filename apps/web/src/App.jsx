@@ -858,7 +858,7 @@ function InventoryDailyBazarView({ token, onBack }) {
             <p>
               <label>Ingredient</label>
               <select style={{ width: "100%" }} value={selectedIng} onChange={e => setSelectedIng(e.target.value)}>
-                {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+                {inventory.map(i => <option key={i.id} value={i.id}>{i.name}{(i.unit === 'g' || i.unit === 'gm') && !i.name.toLowerCase().includes('gm') ? ' 100gm' : ''} ({i.unit})</option>)}
               </select>
             </p>
             <p>
@@ -881,7 +881,7 @@ function InventoryDailyBazarView({ token, onBack }) {
             <p>
               <label>Ingredient</label>
               <select style={{ width: "100%" }} value={selectedIng} onChange={e => setSelectedIng(e.target.value)}>
-                {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+                {inventory.map(i => <option key={i.id} value={i.id}>{i.name}{(i.unit === 'g' || i.unit === 'gm') && !i.name.toLowerCase().includes('gm') ? ' 100gm' : ''} ({i.unit})</option>)}
               </select>
             </p>
             <p>
@@ -906,7 +906,7 @@ function InventoryDailyBazarView({ token, onBack }) {
             {movements.map(m => (
               <tr key={m.id}>
                 <td>{m.date.slice(0, 16).replace("T", " ")}</td>
-                <td><b>{m.ingredient_name}</b></td>
+                <td><b>{m.ingredient_name}{!m.ingredient_name?.toLowerCase().includes('gm') && (m.unit === 'g' || m.unit === 'gm') ? ' 100gm' : ''}</b></td>
                 <td><span style={{ textTransform: "capitalize" }}>{m.type.replace("_", " ")}</span></td>
                 <td style={{ color: m.qty_change < 0 ? "var(--red)" : "var(--green)", fontWeight: 600 }}>
                   {m.qty_change > 0 ? `+${m.qty_change}` : m.qty_change} {m.unit}
@@ -1137,7 +1137,7 @@ function BarcodeCatalogView({ token, onBack }) {
                 </div>
 
                 <div style={{ fontSize: "1rem", fontWeight: 800, margin: "0.2rem 0 0.5rem", color: "var(--ink)", minHeight: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {item.name}
+                  {item.name}{!isDish && (item.unit === 'g' || item.base_unit === 'g') && !item.name.toLowerCase().includes('gm') ? ' 100gm' : ''}
                 </div>
 
                 {item.barcode && (

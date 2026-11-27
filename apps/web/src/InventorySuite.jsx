@@ -5,13 +5,25 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const formatQty = (qty, baseUnit) => {
   const n = Number(qty || 0);
-  if (baseUnit === "g" && Math.abs(n) >= 1000) {
-    return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 2)} kg (${n} g)`;
+  if (baseUnit === "g" || baseUnit === "gm") {
+    return `${n}gm`;
   }
-  if (baseUnit === "ml" && Math.abs(n) >= 1000) {
-    return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 2)} L (${n} ml)`;
+  if (baseUnit === "ml") {
+    if (Math.abs(n) >= 1000) {
+      return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 2)}L (${n}ml)`;
+    }
+    return `${n}ml`;
   }
   return `${n} ${baseUnit || ""}`.trim();
+};
+
+export const formatBazarName = (name, unit = "g") => {
+  if (!name) return "";
+  const u = (unit || "g").toLowerCase();
+  if ((u === "g" || u === "gm") && !name.toLowerCase().includes("gm")) {
+    return `${name} 100gm`;
+  }
+  return name;
 };
 
 const tk = (p) => (p != null && p > 0 ? "৳" + (p / 100).toFixed(2) : "Needs Price");
@@ -477,7 +489,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                 {lines.map((l, idx) => (
                   <tr key={idx}>
                     <td>
-                      <b>{l.name}</b>
+                      <b>{isSale ? l.name : formatBazarName(l.name, l.base_unit)}</b>
                       <div style={{ fontSize: "0.78rem", color: "var(--gray)" }}>
                         <code>{l.barcode}</code>
                         {isSale && l.recipe_version && ` · Recipe v${l.recipe_version}`}
@@ -641,7 +653,7 @@ function RecipesView({ token, api, userRole }) {
   const [wizardStep, setWizardStep] = useState(1); // 1 = Menu Info, 2 = Recipe Ingredients
   const [createdMenuItem, setCreatedMenuItem] = useState(null);
   const [showQuickBazarModal, setShowQuickBazarModal] = useState(false);
-  const [quickBazar, setQuickBazar] = useState({ name: "", unit: "g", pack_size: "1000", min_stock: "0" });
+  const [quickBazar, setQuickBazar] = useState({ name: "", unit: "g", pack_size: "100", min_stock: "100" });
   const [msg, setMsg] = useState("");
 
   const load = async () => {
@@ -712,9 +724,9 @@ function RecipesView({ token, api, userRole }) {
       const created = await api("/inventory", token, {
         name: quickBazar.name.trim(),
         unit: quickBazar.unit,
-        pack_size: parseFloat(quickBazar.pack_size || "1"),
-        pack_unit: `${quickBazar.pack_size} ${quickBazar.unit}`,
-        min_stock: parseInt(quickBazar.min_stock || "0", 10),
+        pack_size: parseFloat(quickBazar.pack_size || "100"),
+        pack_unit: quickBazar.unit === "g" ? `${quickBazar.pack_size || 100}gm` : `${quickBazar.pack_size} ${quickBazar.unit}`,
+        min_stock: parseInt(quickBazar.min_stock || "100", 10),
       });
       // Refresh bazar items
       const updatedInv = await api("/inventory", token);
@@ -905,7 +917,7 @@ function RecipesView({ token, api, userRole }) {
                           }}
                         >
                           {bazarItems.map((b) => (
-                            <option key={b.id} value={b.id}>{b.name} ({b.base_unit})</option>
+                            <option key={b.id} value={b.id}>{formatBazarName(b.name, b.base_unit)} ({b.base_unit})</option>
                           ))}
                         </select>
                       </td>
@@ -1042,7 +1054,7 @@ function RecipesView({ token, api, userRole }) {
                             }}
                           >
                             {bazarItems.map((b) => (
-                              <option key={b.id} value={b.id}>{b.name} ({b.base_unit})</option>
+                              <option key={b.id} value={b.id}>{formatBazarName(b.name, b.base_unit)} ({b.base_unit})</option>
                             ))}
                           </select>
                           <input
@@ -1101,7 +1113,7 @@ function RecipesView({ token, api, userRole }) {
               <div>
                 <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Ingredient Name *</label>
                 <input
-                  placeholder="e.g. Vanilla Syrup, Beef Patty, Cheddar"
+                  placeholder="e.g. Vanilla Syrup, Beef Patty, Fresh Butter 100gm"
                   style={{ width: "100%" }}
                   value={quickBazar.name}
                   onChange={(e) => setQuickBazar({ ...quickBazar, name: e.target.value })}
@@ -1121,7 +1133,7 @@ function RecipesView({ token, api, userRole }) {
                   <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Pack Size</label>
                   <input
                     type="number"
-                    placeholder="1000"
+                    placeholder="100"
                     style={{ width: "100%" }}
                     value={quickBazar.pack_size}
                     onChange={(e) => setQuickBazar({ ...quickBazar, pack_size: e.target.value })}
@@ -1132,7 +1144,7 @@ function RecipesView({ token, api, userRole }) {
                 <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Par Level / Min Stock ({quickBazar.unit})</label>
                 <input
                   type="number"
-                  placeholder="0"
+                  placeholder="100"
                   style={{ width: "100%" }}
                   value={quickBazar.min_stock}
                   onChange={(e) => setQuickBazar({ ...quickBazar, min_stock: e.target.value })}
@@ -1354,7 +1366,7 @@ function InventoryOverviewView({ token, api, userRole }) {
   const [endDate, setEndDate] = useState("");
   const [filterItem, setFilterItem] = useState("");
   const [filterType, setFilterType] = useState("");
-  const [newBazar, setNewBazar] = useState({ name: "", barcode: "", unit: "g", pack_size: "1000", min_stock: "0" });
+  const [newBazar, setNewBazar] = useState({ name: "", barcode: "", unit: "g", pack_size: "100", min_stock: "100" });
   const [lastCreatedBazar, setLastCreatedBazar] = useState(null);
   const [msg, setMsg] = useState("");
 
@@ -1388,11 +1400,11 @@ function InventoryOverviewView({ token, api, userRole }) {
         name: newBazar.name.trim(),
         barcode: newBazar.barcode.trim() ? newBazar.barcode.trim().toUpperCase() : null,
         unit: newBazar.unit,
-        pack_size: parseFloat(newBazar.pack_size || "1"),
-        pack_unit: `${newBazar.pack_size} ${newBazar.unit}`,
-        min_stock: parseInt(newBazar.min_stock || "0", 10),
+        pack_size: parseFloat(newBazar.pack_size || "100"),
+        pack_unit: newBazar.unit === "g" ? `${newBazar.pack_size || 100}gm` : `${newBazar.pack_size} ${newBazar.unit}`,
+        min_stock: parseInt(newBazar.min_stock || "100", 10),
       });
-      setNewBazar({ name: "", barcode: "", unit: "g", pack_size: "1000", min_stock: "0" });
+      setNewBazar({ name: "", barcode: "", unit: "g", pack_size: "100", min_stock: "100" });
       setLastCreatedBazar(created);
       setMsg(`Bazar item "${created.name}" created! Barcode generated: ${created.barcode}`);
       load();
@@ -1448,7 +1460,7 @@ function InventoryOverviewView({ token, api, userRole }) {
           <tbody>
             {summary.map((i) => (
               <tr key={i.id} style={{ background: i.status === "LOW" ? "var(--red-light)" : "transparent" }}>
-                <td><b>{i.name}</b> <br /><small><code>{i.barcode}</code></small></td>
+                <td><b>{formatBazarName(i.name, i.base_unit || i.unit)}</b> <br /><small><code>{i.barcode}</code></small></td>
                 <td>{formatQty(i.central_total, i.base_unit)}</td>
                 <td>{formatQty(i.bazar_total, i.base_unit)}</td>
                 <td>{formatQty(i.sale_total, i.base_unit)}</td>
@@ -1476,7 +1488,7 @@ function InventoryOverviewView({ token, api, userRole }) {
               <tbody>
                 {lowItems.map((i) => (
                   <tr key={i.id}>
-                    <td><b>{i.name}</b></td>
+                    <td><b>{formatBazarName(i.name, i.base_unit || i.unit)}</b></td>
                     <td>{formatQty(i.current_stock, i.base_unit)}</td>
                     <td>{formatQty(i.min_stock, i.base_unit)}</td>
                     <td style={{ color: "var(--blue-primary)", fontWeight: 700 }}>{formatQty(i.suggested_buy, i.base_unit)}</td>
@@ -1494,7 +1506,7 @@ function InventoryOverviewView({ token, api, userRole }) {
               Add ingredient name and details. A scannable Code128 barcode will be generated automatically if barcode is left blank.
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-              <input placeholder="Name (e.g. Fresh Butter)" value={newBazar.name} onChange={(e) => setNewBazar({ ...newBazar, name: e.target.value })} />
+              <input placeholder="Name (e.g. Fresh Butter 100gm)" value={newBazar.name} onChange={(e) => setNewBazar({ ...newBazar, name: e.target.value })} />
               <input placeholder="Barcode (optional - auto-generated)" value={newBazar.barcode} onChange={(e) => setNewBazar({ ...newBazar, barcode: e.target.value })} />
               <select value={newBazar.unit} onChange={(e) => setNewBazar({ ...newBazar, unit: e.target.value })}>
                 <option value="g">g (grams)</option>
@@ -1527,7 +1539,7 @@ function InventoryOverviewView({ token, api, userRole }) {
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
             <select value={filterItem} onChange={(e) => setFilterItem(e.target.value)}>
               <option value="">All Items</option>
-              {summary.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+              {summary.map((i) => <option key={i.id} value={i.id}>{formatBazarName(i.name, i.base_unit || i.unit)}</option>)}
             </select>
             <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
               <option value="">All Types</option>
@@ -1546,7 +1558,7 @@ function InventoryOverviewView({ token, api, userRole }) {
             {ledger.map((e) => (
               <tr key={e.id}>
                 <td>{e.date}</td>
-                <td><b>{e.bazar_item_name}</b></td>
+                <td><b>{formatBazarName(e.bazar_item_name, e.unit)}</b></td>
                 <td><span style={{ textTransform: "uppercase", fontSize: "0.78rem", fontWeight: 700 }}>{e.type}</span></td>
                 <td style={{ color: e.quantity < 0 ? "var(--red)" : "var(--green)", fontWeight: 700 }}>
                   {e.quantity > 0 ? `+${formatQty(e.quantity, e.unit)}` : formatQty(e.quantity, e.unit)}

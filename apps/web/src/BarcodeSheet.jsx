@@ -69,9 +69,11 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
           {bazarWithBarcodes.map((item) => (
             <div key={item.id || item.barcode} style={{ border: "2px solid #000", padding: "12px", borderRadius: "6px", textAlign: "center", pageBreakInside: "avoid" }}>
               <BarcodeSvg value={item.barcode} width={2.2} height={64} />
-              <div style={{ fontSize: "1.1rem", fontWeight: "bold", marginTop: "4px" }}>{item.name}</div>
+              <div style={{ fontSize: "1.1rem", fontWeight: "bold", marginTop: "4px" }}>
+                {item.name}{(item.base_unit === 'g' || item.unit === 'g') && !item.name.toLowerCase().includes('gm') ? ' 100gm' : ''}
+              </div>
               <div style={{ color: "#444", fontSize: "0.85rem" }}>
-                Pack: <b>{item.pack_unit || `${item.pack_size} ${item.base_unit || item.unit}`}</b>
+                Pack: <b>{item.pack_unit || ((item.base_unit === 'g' || item.unit === 'g') ? '100gm' : `${item.pack_size} ${item.base_unit || item.unit}`)}</b>
               </div>
             </div>
           ))}

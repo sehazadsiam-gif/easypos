@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from app.models import Ingredient, Recipe, RecipeItem, StockLedger
 
-ALLOWED_UNITS = {"g", "kg", "ml", "l", "L", "pcs"}
+ALLOWED_UNITS = {"g", "gm", "kg", "ml", "l", "L", "pcs"}
 
 
 def today_str() -> str:
@@ -34,8 +34,8 @@ def convert_to_base_units(amount: float, unit: str, base_unit: str) -> int:
     u_lower = u.lower()
     bu = base_unit.strip().lower()
 
-    if bu == "g":
-        if u_lower == "g":
+    if bu in ("g", "gm"):
+        if u_lower in ("g", "gm"):
             return int(round(amount))
         if u_lower == "kg":
             return int(round(amount * 1000))
