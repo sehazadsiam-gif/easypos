@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { PrintableBarcodeSheet, BarcodeSvg } from "./BarcodeSheet";
+import { IconAlert, IconClose, IconCheck, IconEdit, IconPlus, IconPrinter, IconSearch } from "./Icons";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -378,8 +379,9 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
 
           <div className="scanner-container" style={{ margin: "0.8rem 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                🔴 Hardware Laser Scanner Active (Auto-Focused)
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                <span className="live-dot" style={{ background: "var(--emerald)", display: "inline-block", width: "8px", height: "8px", borderRadius: "50%" }}></span>
+                Hardware Laser Scanner Active (Auto-Focused)
               </span>
               <span style={{ fontSize: "0.75rem", background: "#334155", color: "#f8fafc", padding: "2px 8px", borderRadius: "4px" }}>
                 CODE-128
@@ -556,7 +558,9 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
 
           {isSale && warnings.length > 0 && (
             <div style={{ marginTop: "1rem", padding: "0.85rem", borderRadius: "8px", background: "var(--red-light)", color: "#991b1b" }}>
-              <b>⚠ Not enough stock:</b>
+              <b style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                <IconAlert size={15} color="#991b1b" /> Insufficient Stock:
+              </b>
               <ul style={{ margin: "0.4rem 0" }}>
                 {warnings.map((w) => (
                   <li key={w.bazar_item_id}>
@@ -633,7 +637,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                 </div>
                 <div style={{ fontSize: "0.78rem", color: "var(--gray)", marginTop: "3px" }}>
                   {b.line_count} items · by {b.created_by}
-                  {b.approved_by ? ` · ✓ ${b.approved_by}` : ""}
+                  {b.approved_by ? ` · Verified: ${b.approved_by}` : ""}
                 </div>
               </button>
             ))}
@@ -950,7 +954,7 @@ function RecipesView({ token, api, userRole }) {
                         </select>
                       </td>
                       <td>
-                        <button className="warn" onClick={() => setDraftLines(draftLines.filter((_, i) => i !== idx))}>✕</button>
+                        <button className="warn" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: "28px", padding: "0 8px" }} onClick={() => setDraftLines(draftLines.filter((_, i) => i !== idx))}><IconClose size={13} /></button>
                       </td>
                     </tr>
                   );
@@ -978,7 +982,7 @@ function RecipesView({ token, api, userRole }) {
               <h3 style={{ margin: 0, color: "var(--blue-primary)" }}>
                 {wizardStep === 1 ? "Step 1: Add Menu Item" : `Step 2: Recipe for ${createdMenuItem?.name}`}
               </h3>
-              <button onClick={() => setShowAddMenuModal(false)}>✕</button>
+              <button onClick={() => setShowAddMenuModal(false)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: "28px", padding: "0 8px" }}><IconClose size={14} /></button>
             </div>
 
             {wizardStep === 1 ? (
@@ -1082,8 +1086,8 @@ function RecipesView({ token, api, userRole }) {
                           >
                             {units.map((u) => <option key={u} value={u}>{u}</option>)}
                           </select>
-                          <button className="warn" style={{ minHeight: "34px", padding: "0.2rem 0.5rem" }} onClick={() => setDraftLines(draftLines.filter((_, i) => i !== idx))}>
-                            ✕
+                          <button className="warn" style={{ minHeight: "34px", padding: "0.2rem 0.5rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }} onClick={() => setDraftLines(draftLines.filter((_, i) => i !== idx))}>
+                            <IconClose size={13} />
                           </button>
                         </div>
                       );
@@ -1107,7 +1111,7 @@ function RecipesView({ token, api, userRole }) {
           <div className="card" style={{ maxWidth: 460, width: "100%", background: "#fff" }}>
             <div className="row" style={{ borderBottom: "1px solid var(--line)", paddingBottom: "0.5rem", marginBottom: "0.8rem" }}>
               <h3 style={{ margin: 0, color: "var(--blue-primary)" }}>+ Add New Bazar Item (Ingredient)</h3>
-              <button onClick={() => setShowQuickBazarModal(false)}>✕</button>
+              <button onClick={() => setShowQuickBazarModal(false)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: "28px", padding: "0 8px" }}><IconClose size={14} /></button>
             </div>
             <p style={{ margin: "0 0 0.8rem", fontSize: "0.82rem", color: "var(--gray)" }}>
               Create a new raw ingredient and auto-generate its Code128 barcode.
@@ -1230,8 +1234,8 @@ function MenuApprovedView({ token, api, userRole }) {
           <p style={{ color: "var(--gray)", fontSize: "0.85rem", margin: "4px 0 0" }}>
             Click <b>Set Price</b> on any dish to manually enter its selling price in Taka.
             {unpricedCount > 0 && (
-              <span style={{ marginLeft: "8px", background: "#fef3c7", color: "#92400e", padding: "3px 8px", borderRadius: "999px", fontWeight: 700, fontSize: "0.78rem" }}>
-                ⚠️ {unpricedCount} dishes need selling price
+              <span style={{ marginLeft: "8px", background: "#fef3c7", color: "#92400e", padding: "3px 8px", borderRadius: "999px", fontWeight: 700, fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                <IconAlert size={13} color="#92400e" /> {unpricedCount} dishes need selling price
               </span>
             )}
           </p>
@@ -1239,7 +1243,7 @@ function MenuApprovedView({ token, api, userRole }) {
         <div>
           <input
             type="text"
-            placeholder="🔍 Search dish or barcode..."
+            placeholder="Search dish or barcode..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ width: "220px", padding: "6px 10px" }}
@@ -1330,8 +1334,8 @@ function MenuApprovedView({ token, api, userRole }) {
                       <button className="primary" style={{ padding: "6px 12px", fontSize: "0.82rem" }} disabled={saving} onClick={(e) => handleSavePrice(m.id, e)}>
                         {saving ? "..." : "Save"}
                       </button>
-                      <button style={{ padding: "6px 8px", fontSize: "0.82rem" }} onClick={(e) => { e.stopPropagation(); setEditingItemId(null); }}>
-                        ✕
+                      <button style={{ padding: "6px 8px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }} onClick={(e) => { e.stopPropagation(); setEditingItemId(null); }}>
+                        <IconClose size={13} />
                       </button>
                     </div>
                   </div>
@@ -1348,7 +1352,7 @@ function MenuApprovedView({ token, api, userRole }) {
                       style={{ fontSize: "0.8rem", padding: "5px 12px", borderRadius: "6px" }}
                       onClick={(e) => handleStartEdit(m, e)}
                     >
-                      {hasPrice ? "✏️ Edit Price" : "➕ Set Price"}
+                      {hasPrice ? "Edit Price" : "Set Price"}
                     </button>
                   </div>
                 )}
@@ -1523,8 +1527,8 @@ function InventoryOverviewView({ token, api, userRole }) {
 
             {lastCreatedBazar && (
               <div style={{ marginTop: "1rem", padding: "0.75rem", border: "2px solid var(--green)", borderRadius: "8px", background: "var(--green-light)", textAlign: "center" }}>
-                <div style={{ fontWeight: 700, color: "#065f46", marginBottom: "0.4rem" }}>
-                  ✓ Successfully Created: {lastCreatedBazar.name}
+                <div style={{ fontWeight: 700, color: "#065f46", marginBottom: "0.4rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", justifyContent: "center" }}>
+                  <IconCheck size={16} color="#065f46" /> Successfully Created: {lastCreatedBazar.name}
                 </div>
                 <BarcodeSvg value={lastCreatedBazar.barcode} width={2.2} height={50} />
                 <div style={{ fontSize: "0.8rem", color: "#065f46", marginTop: "4px" }}>
@@ -1622,7 +1626,10 @@ export function InventorySuite({ token, api, userRole, onBack }) {
         <button className={tab === "recipes" ? "active" : ""} onClick={() => setTab("recipes")}>Recipes</button>
         <button className={tab === "menu" ? "active" : ""} onClick={() => setTab("menu")}>Menu</button>
         <button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Inventory</button>
-        <button className={tab === "barcodes" ? "active" : ""} onClick={() => setTab("barcodes")}>🖨 Barcode Sheets</button>
+        <button className={tab === "barcodes" ? "active" : ""} onClick={() => setTab("barcodes")} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+          <IconPrinter size={15} />
+          <span>Barcode Sheets</span>
+        </button>
       </div>
 
       {(tab === "central" || tab === "bazar" || tab === "sale") && (

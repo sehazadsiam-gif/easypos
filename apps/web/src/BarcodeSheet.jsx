@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
+import { IconPrinter, IconCutlery, IconShoppingBag, IconLayers } from "./Icons";
 
 export function BarcodeSvg({ value, width = 1.8, height = 48, showText = true }) {
   const svgRef = useRef(null);
@@ -33,12 +34,12 @@ export function BarcodeSvg({ value, width = 1.8, height = 48, showText = true })
 
 // 6 Core Pantry Departments for Bazar Ingredients
 const INGREDIENT_CATEGORIES = {
-  "🥩 Proteins & Poultry": ["beef", "chicken", "prawn", "fish", "bacon", "egg", "wings", "strips", "thigh", "fillet", "meat", "tori"],
-  "🧀 Dairy & Cold Storage": ["butter", "milk", "cheese", "cream", "yogurt", "ice cream", "mozzarella", "parmesan"],
-  "🥖 Bakery & Starches": ["flour", "bread", "ciabatta", "bagel", "croissant", "rice", "pasta", "noodle", "breadcrumbs", "tortilla", "bun", "cornflour", "spaghetti", "fettuccine", "penne", "wrapper", "batter"],
-  "🥦 Produce & Vegetables": ["lettuce", "tomato", "onion", "garlic", "ginger", "carrot", "cabbage", "capsicum", "cucumber", "lemon", "lime", "spring onion", "mushroom", "coriander", "herb", "parsley", "chilli", "potato", "avocado", "sprout", "cauliflower", "basil", "mint", "pickle", "rosemary", "grape", "spinach", "bean", "vegetable"],
-  "🍶 Sauces, Pastes & Oils": ["sauce", "oil", "mayo", "mayonnaise", "paste", "ketchup", "mustard", "honey", "vinegar", "syrup", "dressing", "extract"],
-  "🧂 Spices, Seasonings & Dry": ["salt", "pepper", "sugar", "paprika", "baking powder", "sesame", "ajinomoto", "powder", "cashew", "flakes", "cornstarch", "coffee", "cocoa", "nori", "oregano", "peanut", "chocolate"]
+  "Proteins & Poultry": ["beef", "chicken", "prawn", "fish", "bacon", "egg", "wings", "strips", "thigh", "fillet", "meat", "tori"],
+  "Dairy & Cold Storage": ["butter", "milk", "cheese", "cream", "yogurt", "ice cream", "mozzarella", "parmesan"],
+  "Bakery & Starches": ["flour", "bread", "ciabatta", "bagel", "croissant", "rice", "pasta", "noodle", "breadcrumbs", "tortilla", "bun", "cornflour", "spaghetti", "fettuccine", "penne", "wrapper", "batter"],
+  "Produce & Vegetables": ["lettuce", "tomato", "onion", "garlic", "ginger", "carrot", "cabbage", "capsicum", "cucumber", "lemon", "lime", "spring onion", "mushroom", "coriander", "herb", "parsley", "chilli", "potato", "avocado", "sprout", "cauliflower", "basil", "mint", "pickle", "rosemary", "grape", "spinach", "bean", "vegetable"],
+  "Sauces, Pastes & Oils": ["sauce", "oil", "mayo", "mayonnaise", "paste", "ketchup", "mustard", "honey", "vinegar", "syrup", "dressing", "extract"],
+  "Spices, Seasonings & Dry": ["salt", "pepper", "sugar", "paprika", "baking powder", "sesame", "ajinomoto", "powder", "cashew", "flakes", "cornstarch", "coffee", "cocoa", "nori", "oregano", "peanut", "chocolate"]
 };
 
 export const classifyIngredient = (name = "") => {
@@ -48,7 +49,7 @@ export const classifyIngredient = (name = "") => {
       return cat;
     }
   }
-  return "📦 Other Pantry";
+  return "Other Pantry";
 };
 
 export const formatBazarLabel = (item) => {
@@ -110,15 +111,17 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
           <div>
             <h2 style={{ margin: 0, color: "var(--brand-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              🖨️ Organized Barcode Printing Sheets
+              <IconPrinter size={22} />
+              <span>Organized Barcode Printing Sheets</span>
             </h2>
             <p style={{ margin: "4px 0 0", color: "var(--ink-muted)", fontSize: "0.88rem" }}>
               Organized by departments and menu categories. Formatted for standard A4 sticker paper (3 columns) or reference cards.
             </p>
           </div>
           <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
-            <button className="primary" onClick={() => window.print()} style={{ fontWeight: 700, padding: "0.5rem 1.25rem", fontSize: "0.95rem" }}>
-              🖨 Print Selected Sheets
+            <button className="primary" onClick={() => window.print()} style={{ fontWeight: 700, padding: "0.5rem 1.25rem", fontSize: "0.95rem", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+              <IconPrinter size={16} />
+              <span>Print Selected Sheets</span>
             </button>
             {onBack && <button onClick={onBack} style={{ padding: "0.5rem 1rem" }}>← Back</button>}
           </div>
@@ -131,28 +134,28 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
             style={{ fontSize: "0.85rem", padding: "6px 14px", borderRadius: "8px" }}
             onClick={() => { setSectionFilter("all"); setSpecificCategory("all"); }}
           >
-            📋 All Sections ({menuWithBarcodes.length + bazarWithBarcodes.length + quantityCodes.length})
+            All Sections ({menuWithBarcodes.length + bazarWithBarcodes.length + quantityCodes.length})
           </button>
           <button
             className={sectionFilter === "dishes" ? "primary" : "secondary"}
             style={{ fontSize: "0.85rem", padding: "6px 14px", borderRadius: "8px" }}
             onClick={() => { setSectionFilter("dishes"); setSpecificCategory("all"); }}
           >
-            🍽️ Menu Dishes ({menuWithBarcodes.length})
+            Menu Dishes ({menuWithBarcodes.length})
           </button>
           <button
             className={sectionFilter === "ingredients" ? "primary" : "secondary"}
             style={{ fontSize: "0.85rem", padding: "6px 14px", borderRadius: "8px" }}
             onClick={() => { setSectionFilter("ingredients"); setSpecificCategory("all"); }}
           >
-            🛒 Bazar Ingredients ({bazarWithBarcodes.length})
+            Bazar Ingredients ({bazarWithBarcodes.length})
           </button>
           <button
             className={sectionFilter === "modifiers" ? "primary" : "secondary"}
             style={{ fontSize: "0.85rem", padding: "6px 14px", borderRadius: "8px" }}
             onClick={() => { setSectionFilter("modifiers"); setSpecificCategory("all"); }}
           >
-            ⚡ Quantity Modifiers ({quantityCodes.length})
+            Quantity Modifiers ({quantityCodes.length})
           </button>
         </div>
 
@@ -208,7 +211,7 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
           <div style={{ marginBottom: "2rem" }}>
             <div className="barcode-category-header" style={{ background: "#1e1b4b", color: "#ffffff", padding: "8px 14px", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
               <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, letterSpacing: "0.02em" }}>
-                🍽️ SECTION 1: MENU DISHES (SELLING)
+                SECTION 1: MENU DISHES (SELLING)
               </h3>
               <span style={{ fontSize: "0.82rem", background: "rgba(255,255,255,0.2)", padding: "2px 8px", borderRadius: "4px" }}>
                 POS Counter Scannable
@@ -265,7 +268,7 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
           <div style={{ marginBottom: "2rem" }}>
             <div className="barcode-category-header" style={{ background: "#065f46", color: "#ffffff", padding: "8px 14px", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
               <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, letterSpacing: "0.02em" }}>
-                🛒 SECTION 2: BAZAR INGREDIENTS (STOCK & PURCHASES)
+                SECTION 2: BAZAR INGREDIENTS (STOCK & PURCHASES)
               </h3>
               <span style={{ fontSize: "0.82rem", background: "rgba(255,255,255,0.2)", padding: "2px 8px", borderRadius: "4px" }}>
                 Bazar & Opening Stock Intake
@@ -322,7 +325,7 @@ export function PrintableBarcodeSheet({ items = [], menuItems = [], onBack }) {
           <div style={{ marginBottom: "2rem", pageBreakInside: "avoid" }}>
             <div className="barcode-category-header" style={{ background: "#4338ca", color: "#ffffff", padding: "8px 14px", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
               <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, letterSpacing: "0.02em" }}>
-                ⚡ SECTION 3: SCANNER MODIFIER CHEAT CODES
+                SECTION 3: SCANNER MODIFIER CHEAT CODES
               </h3>
               <span style={{ fontSize: "0.82rem", background: "rgba(255,255,255,0.2)", padding: "2px 8px", borderRadius: "4px" }}>
                 Scan After Item to Multiply

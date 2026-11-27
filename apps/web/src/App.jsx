@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { getOutbox, queueOutbox, flushOutbox } from "./outbox";
 import { PrintableBarcodeSheet, BarcodeSvg } from "./BarcodeSheet";
 import { InventorySuite } from "./InventorySuite";
+import {
+  IconCrown, IconLocation, IconSync, IconBarcode, IconInventory,
+  IconFloorPlan, IconReports, IconDineIn, IconTakeaway, IconDelivery,
+  IconSearch, IconPrinter, IconCheck, IconAlert, IconClose, IconPlus,
+  IconEdit, IconLock, IconUser, IconBuilding, IconDownload, IconBell,
+  IconArrowRight, IconShield, IconCutlery, IconCamera
+} from "./Icons";
 
 const api = async (path, token, body, method) => {
   const r = await fetch("/api" + path, {
@@ -53,25 +60,26 @@ const CHANNELS = [
 ];
 
 function Login({ onLogin, onInstall, canInstall }) {
-  const [f, setF] = useState({ tenant: "crown", emp_id: "1001", password: "258000" });
+  const [f, setF] = useState({ tenant: "", emp_id: "", password: "" });
   const [err, setErr] = useState("");
-  const [activeRole, setActiveRole] = useState("owner");
   const [loading, setLoading] = useState(false);
-
-  const selectRole = (role, empId) => {
-    setActiveRole(role);
-    const pwd = role === "owner" ? "258000" : (role === "manager" ? "456456" : "admin123");
-    setF({ tenant: "crown", emp_id: empId, password: pwd });
-    setErr("");
-  };
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   const go = async () => {
+    if (!f.emp_id.trim() || !f.password) {
+      setErr("Please enter your employee ID and security PIN/password.");
+      return;
+    }
     setLoading(true);
     setErr("");
     try {
-      const res = await api("/auth/login", null, f);
+      const payload = {
+        tenant: f.tenant.trim() || "crown",
+        emp_id: f.emp_id.trim(),
+        password: f.password
+      };
+      const res = await api("/auth/login", null, payload);
       onLogin(res);
     } catch (e) {
       setErr(e.message);
@@ -84,7 +92,7 @@ function Login({ onLogin, onInstall, canInstall }) {
     <div className="auth-viewport">
       <div className="auth-header-pill">
         <span className="live-dot" style={{ background: "#10b981" }}></span>
-        <span>Crown Enterprise Cloud POS · Terminal Node #01</span>
+        <span>Enterprise Cloud Terminal Node</span>
       </div>
 
       <div className="auth-card">
@@ -94,42 +102,8 @@ function Login({ onLogin, onInstall, canInstall }) {
           </div>
           <h1 className="auth-title">crownpointofsale</h1>
           <p className="auth-subtitle">
-            Enterprise Cloud Point of Sale & Terminal Console
+            Enterprise Point of Sale & Terminal Console
           </p>
-        </div>
-
-        {/* 1-Click Fast Role Switcher */}
-        <div className="auth-role-group">
-          <label className="auth-role-label">Quick Staff Access</label>
-          <div className="auth-roles-grid">
-            <button
-              type="button"
-              className={`auth-role-btn ${activeRole === "owner" ? "active" : ""}`}
-              onClick={() => selectRole("owner", "1001")}
-            >
-              <span style={{ fontSize: "1.1rem" }}>👑</span>
-              <span>Owner</span>
-              <span style={{ fontSize: "0.62rem", color: "#64748b", fontWeight: 700 }}>All Access</span>
-            </button>
-            <button
-              type="button"
-              className={`auth-role-btn ${activeRole === "manager" ? "active" : ""}`}
-              onClick={() => selectRole("manager", "1002")}
-            >
-              <span style={{ fontSize: "1.1rem" }}>👔</span>
-              <span>Manager</span>
-              <span style={{ fontSize: "0.62rem", color: "#64748b", fontWeight: 700 }}>Stock & Inv</span>
-            </button>
-            <button
-              type="button"
-              className={`auth-role-btn ${activeRole === "cashier" ? "active" : ""}`}
-              onClick={() => selectRole("cashier", "1003")}
-            >
-              <span style={{ fontSize: "1.1rem" }}>💳</span>
-              <span>Cashier</span>
-              <span style={{ fontSize: "0.62rem", color: "#64748b", fontWeight: 700 }}>POS Only</span>
-            </button>
-          </div>
         </div>
 
         {/* Credentials Form */}
@@ -139,12 +113,15 @@ function Login({ onLogin, onInstall, canInstall }) {
             <span style={{ color: "#94a3b8", fontWeight: 500 }}>Workspace</span>
           </label>
           <div className="auth-input-wrapper">
-            <span className="auth-input-icon">🏢</span>
+            <span className="auth-input-icon">
+              <IconBuilding size={16} color="#94a3b8" />
+            </span>
             <input
               className="auth-input"
-              placeholder="e.g. crown"
+              placeholder="crown"
               value={f.tenant}
               onChange={set("tenant")}
+              autoComplete="organization"
             />
           </div>
         </div>
@@ -155,15 +132,16 @@ function Login({ onLogin, onInstall, canInstall }) {
             <span style={{ color: "#94a3b8", fontWeight: 500 }}>ID Number</span>
           </label>
           <div className="auth-input-wrapper">
-            <span className="auth-input-icon">👤</span>
+            <span className="auth-input-icon">
+              <IconUser size={16} color="#94a3b8" />
+            </span>
             <input
               className="auth-input"
-              placeholder="1001"
+              placeholder="Enter Employee ID"
               value={f.emp_id}
-              onChange={(e) => {
-                set("emp_id")(e);
-                setActiveRole("");
-              }}
+              onChange={set("emp_id")}
+              autoFocus
+              autoComplete="username"
             />
           </div>
         </div>
@@ -174,14 +152,17 @@ function Login({ onLogin, onInstall, canInstall }) {
             <span style={{ color: "#94a3b8", fontWeight: 500 }}>Required</span>
           </label>
           <div className="auth-input-wrapper">
-            <span className="auth-input-icon">🔒</span>
+            <span className="auth-input-icon">
+              <IconLock size={16} color="#94a3b8" />
+            </span>
             <input
               type="password"
               className="auth-input"
-              placeholder="••••••••"
+              placeholder="Enter PIN or Password"
               value={f.password}
               onChange={set("password")}
               onKeyDown={(e) => e.key === "Enter" && go()}
+              autoComplete="current-password"
             />
           </div>
         </div>
@@ -200,7 +181,7 @@ function Login({ onLogin, onInstall, canInstall }) {
             alignItems: "center",
             gap: "0.5rem"
           }}>
-            <span>⚠</span>
+            <IconAlert size={16} color="var(--rose)" />
             <span>{err}</span>
           </div>
         )}
@@ -210,7 +191,8 @@ function Login({ onLogin, onInstall, canInstall }) {
           onClick={go}
           disabled={loading}
         >
-          {loading ? "Authenticating..." : "Sign In to Terminal →"}
+          <span>{loading ? "Authenticating..." : "Sign In to Terminal"}</span>
+          <IconArrowRight size={18} />
         </button>
 
         {canInstall && (
@@ -234,14 +216,16 @@ function Login({ onLogin, onInstall, canInstall }) {
               cursor: "pointer"
             }}
           >
-            <span>📲 Install Crown POS Desktop / Tablet App</span>
+            <IconDownload size={16} />
+            <span>Install Crown POS Desktop / Tablet App</span>
           </button>
         )}
 
         <div className="auth-footer">
-          <span>🔒 256-Bit Bank-Grade Encryption</span>
+          <IconShield size={14} color="#94a3b8" />
+          <span>256-Bit Financial Encryption</span>
           <span>·</span>
-          <span>Offline Outbox Ready</span>
+          <span>Offline Terminal Node Ready</span>
         </div>
       </div>
     </div>
@@ -304,7 +288,10 @@ function Pay({ order, token, onDone, isOffline }) {
     <div className="card" style={{ maxWidth: 480, margin: "0 auto" }}>
       <div className="row">
         <h2 style={{ margin: 0 }}>Payment · {order.slot || "Order"}</h2>
-        <button className="secondary" onClick={printBill}>🖨 Print Bill First</button>
+        <button className="secondary" onClick={printBill} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+          <IconPrinter size={15} />
+          <span>Print Bill First</span>
+        </button>
       </div>
 
       <div style={{ background: "var(--blue-light)", padding: "1rem", borderRadius: "8px", margin: "1rem 0" }}>
@@ -517,17 +504,17 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
         <div style={{ display: "flex", gap: "0.8rem", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap" }}>
           <div style={{ position: "relative", flex: 1, minWidth: "220px" }}>
             <input
-              placeholder="🔍 Search dishes (e.g. Tori, Sushi, Croissant, Wings...)"
-              style={{ width: "100%", paddingLeft: "2.4rem", borderRadius: "999px", background: "#ffffff" }}
+              placeholder="Search dishes (e.g. Tori, Sushi, Croissant, Wings...)"
+              style={{ width: "100%", paddingLeft: "1.2rem", borderRadius: "999px", background: "#ffffff" }}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", minHeight: "26px", padding: "0 8px", border: "none", background: "transparent", color: "var(--ink-muted)", cursor: "pointer" }}
+                style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", minHeight: "26px", padding: "0 8px", border: "none", background: "transparent", color: "var(--ink-muted)", cursor: "pointer", display: "flex", alignItems: "center" }}
               >
-                ✕
+                <IconClose size={14} />
               </button>
             )}
           </div>
@@ -639,7 +626,7 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
         {channel === "dine_in" && (
           <p style={{ margin: "0 0 0.8rem 0" }}>
             <input
-              placeholder="👤 Waiter / Server Name *"
+              placeholder="Waiter / Server Name *"
               value={waiter}
               onChange={(e) => setWaiter(e.target.value)}
               style={{ width: "100%", padding: "0.6rem 0.9rem", fontWeight: 500 }}
@@ -650,7 +637,9 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
         <div style={{ maxHeight: "320px", overflowY: "auto", paddingRight: "4px" }}>
           {cartTotalItems === 0 ? (
             <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-muted)" }}>
-              <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🍽️</div>
+              <div style={{ marginBottom: "0.6rem", display: "flex", justifyContent: "center" }}>
+                <IconCutlery size={36} color="#94a3b8" />
+              </div>
               <b>Your ticket is empty</b>
               <p style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>Tap any dish on the left to add it to the ticket</p>
             </div>
@@ -696,12 +685,23 @@ function OrderView({ channel, slot, token, cfg, onDone, onPay, isOffline }) {
           </div>
         </div>
 
-        {err && <p style={{ color: "var(--rose)", fontWeight: 700, margin: "0.6rem 0", fontSize: "0.88rem" }}>⚠️ {err}</p>}
+        {err && (
+          <p style={{ color: "var(--rose)", fontWeight: 700, margin: "0.6rem 0", fontSize: "0.88rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <IconAlert size={16} color="var(--rose)" />
+            <span>{err}</span>
+          </p>
+        )}
 
         <div className="row" style={{ marginTop: "1.25rem", gap: "0.6rem" }}>
           <button onClick={onDone} style={{ flex: 1 }}>Back</button>
-          <button className="secondary" onClick={() => submit(false)} style={{ flex: 1.2 }}>🖨 KOT</button>
-          <button className="primary" onClick={() => submit(true)} style={{ flex: 1.5, fontWeight: 700 }}>💳 Pay Now</button>
+          <button className="secondary" onClick={() => submit(false)} style={{ flex: 1.2, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
+            <IconPrinter size={15} />
+            <span>Send KOT</span>
+          </button>
+          <button className="primary" onClick={() => submit(true)} style={{ flex: 1.5, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
+            <IconCheck size={16} />
+            <span>Pay Now</span>
+          </button>
         </div>
       </div>
     </div>
@@ -845,13 +845,19 @@ function InventoryDailyBazarView({ token, onBack }) {
       <div className="row">
         <h2 style={{ margin: 0, color: "var(--blue-primary)" }}>Inventory & Stock Management</h2>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button className="secondary" onClick={() => setShowBarcodeSheet(true)}>🖨 Print Ingredient Barcodes</button>
+          <button className="secondary" onClick={() => setShowBarcodeSheet(true)} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+            <IconPrinter size={15} />
+            <span>Print Ingredient Barcodes</span>
+          </button>
           <button onClick={onBack}>Back to POS</button>
         </div>
       </div>
 
       <div className="nav-tabs" style={{ marginTop: "1rem" }}>
-        <button className={tab === "scanner" ? "active" : ""} onClick={() => setTab("scanner")}>📷 Production Barcode Scanner</button>
+        <button className={tab === "scanner" ? "active" : ""} onClick={() => setTab("scanner")} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+          <IconCamera size={15} />
+          <span>Production Barcode Scanner</span>
+        </button>
         <button className={tab === "inventory" ? "active" : ""} onClick={() => setTab("inventory")}>Stock Levels</button>
         <button className={tab === "bazar" ? "active" : ""} onClick={() => setTab("bazar")}>Manual Bazar Entry</button>
         <button className={tab === "wastage" ? "active" : ""} onClick={() => setTab("wastage")}>Wastage / Adjustment</button>
@@ -929,7 +935,7 @@ function InventoryDailyBazarView({ token, onBack }) {
                             }}
                           />
                         </td>
-                        <td><button className="warn" style={{ minHeight: "24px", padding: "0.1rem 0.4rem" }} onClick={() => setScannedCart(scannedCart.filter((_, i) => i !== idx))}>✕</button></td>
+                        <td><button className="warn" style={{ minHeight: "24px", padding: "0.1rem 0.4rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }} onClick={() => setScannedCart(scannedCart.filter((_, i) => i !== idx))}><IconClose size={13} /></button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -1148,8 +1154,8 @@ function BarcodeCatalogView({ token, onBack }) {
   }, [token]);
 
   const allItems = [
-    ...dishes.map(d => ({ ...d, itemType: "dish", typeLabel: "🍽️ Menu Dish" })),
-    ...ingredients.map(i => ({ ...i, itemType: "ingredient", typeLabel: "🛒 Ingredient" }))
+    ...dishes.map(d => ({ ...d, itemType: "dish", typeLabel: "Menu Dish" })),
+    ...ingredients.map(i => ({ ...i, itemType: "ingredient", typeLabel: "Bazar Ingredient" }))
   ];
 
   const filtered = allItems.filter(item => {
@@ -1186,7 +1192,10 @@ function BarcodeCatalogView({ token, onBack }) {
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button className="primary" onClick={() => window.print()}>🖨 Print Barcode Sheet</button>
+          <button className="primary" onClick={() => window.print()} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+            <IconPrinter size={16} />
+            <span>Print Barcode Sheet</span>
+          </button>
         </div>
       </div>
 
@@ -1196,16 +1205,16 @@ function BarcodeCatalogView({ token, onBack }) {
             All Barcodes ({allItems.length})
           </button>
           <button className={tab === "dishes" ? "active" : ""} onClick={() => { setTab("dishes"); setSubCat("All"); }}>
-            🍽️ Menu Dishes ({dishes.length})
+            Menu Dishes ({dishes.length})
           </button>
           <button className={tab === "ingredients" ? "active" : ""} onClick={() => { setTab("ingredients"); setSubCat("All"); }}>
-            🛒 Ingredients ({ingredients.length})
+            Bazar Ingredients ({ingredients.length})
           </button>
         </div>
         <div>
           <input
             type="text"
-            placeholder="🔍 Search name, MENU-, ING-..."
+            placeholder="Search name, MENU-, ING-..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ width: "260px", padding: "8px 12px", fontSize: "0.9rem" }}
@@ -1421,16 +1430,18 @@ export default function App() {
               </span>
             </div>
           </div>
-          <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)", fontWeight: 600, background: "var(--paper-subtle)", padding: "3px 8px", borderRadius: "999px" }}>
-            📍 {me.branch || "Uttara"}
+          <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)", fontWeight: 600, background: "var(--paper-subtle)", padding: "3px 10px", borderRadius: "999px", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+            <IconLocation size={14} color="#64748b" />
+            <span>{me.branch || "Uttara"}</span>
           </span>
           <span className={`status-badge ${isOnline ? "online" : "offline"}`}>
             <span className="live-dot" style={{ background: isOnline ? "var(--emerald)" : "var(--rose)" }}></span>
             {isOnline ? "Online" : "Offline Outbox"}
           </span>
           {outboxCount > 0 && (
-            <button className="secondary" onClick={triggerSync} style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", minHeight: "32px", animation: "pulseLive 2s infinite" }}>
-              ⚡ Sync Outbox ({outboxCount})
+            <button className="secondary" onClick={triggerSync} style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", minHeight: "32px", animation: "pulseLive 2s infinite", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+              <IconSync size={14} />
+              <span>Sync Outbox ({outboxCount})</span>
             </button>
           )}
           {installPrompt && (
@@ -1451,28 +1462,36 @@ export default function App() {
                 fontWeight: 700
               }}
             >
-              📲 Install App
+              <IconDownload size={14} />
+              <span>Install App</span>
             </button>
           )}
-          <button className="secondary" onClick={() => setView({ name: "barcode_catalog" })} style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", minHeight: "32px", background: "var(--brand-light)", color: "var(--brand-primary)", border: "1.5px solid var(--brand-primary)" }}>
-            🏷️ Barcode Catalog
+          <button className="secondary" onClick={() => setView({ name: "barcode_catalog" })} style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", minHeight: "32px", background: "var(--brand-light)", color: "var(--brand-primary)", border: "1.5px solid var(--brand-primary)", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+            <IconBarcode size={15} />
+            <span>Barcode Catalog</span>
           </button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", flexWrap: "wrap" }}>
           <span style={{ fontSize: "0.88rem", background: "var(--paper-subtle)", padding: "0.3rem 0.75rem", borderRadius: "8px" }}>
             {me.role === "manager" ? (
-              <span style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
-                👔 Manager · <small style={{ color: "var(--emerald)", fontWeight: 800 }}>Inventory & Stock Portal</small>
+              <span style={{ color: "var(--brand-primary)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                <IconInventory size={15} />
+                <span>Manager · Inventory Portal</span>
               </span>
             ) : shift ? (
-              <span style={{ color: "var(--brand-primary)", fontWeight: 700 }}>
-                🟢 {shift.label} <small>({tk(shift.opening_cash)})</small>
+              <span style={{ color: "var(--brand-primary)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                <span className="live-dot" style={{ background: "var(--emerald)" }}></span>
+                <span>{shift.label}</span>
+                <small style={{ color: "var(--ink-muted)", fontWeight: 500 }}>({tk(shift.opening_cash)})</small>
               </span>
             ) : (
-              <span style={{ color: "var(--rose)", fontWeight: 600 }}>🔴 Register Closed</span>
+              <span style={{ color: "var(--rose)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                <span className="live-dot" style={{ background: "var(--rose)" }}></span>
+                <span>Register Closed</span>
+              </span>
             )}
             {" · "}
-            <b>{me.name}</b> <small style={{ color: "var(--ink-muted)" }}>({me.role === "owner" ? "👑 Owner · Full Access" : me.role})</small>
+            <b>{me.name}</b> <small style={{ color: "var(--ink-muted)" }}>({me.role === "owner" ? "Owner · Executive" : me.role})</small>
           </span>
           {me.role !== "manager" && (
             shift ? (
@@ -1493,10 +1512,10 @@ export default function App() {
 
       <main>
         {msg && (
-          <div className="toast-msg" onClick={() => setMsg("")} style={{ cursor: "pointer" }}>
-            <span>🔔</span>
+          <div className="toast-msg" onClick={() => setMsg("")} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <IconBell size={16} />
             <div style={{ flex: 1 }}>{msg}</div>
-            <small style={{ opacity: 0.7 }}>✕</small>
+            <IconClose size={14} style={{ opacity: 0.7 }} />
           </div>
         )}
 
@@ -1525,20 +1544,21 @@ export default function App() {
           ) : (
           <div>
             <div style={{ marginBottom: "1.5rem" }}>
-              <h2 style={{ margin: "0 0 0.4rem 0", color: "var(--ink)", letterSpacing: "-0.02em" }}>Welcome, {me.name} 👋</h2>
+              <h2 style={{ margin: "0 0 0.4rem 0", color: "var(--ink)", letterSpacing: "-0.02em" }}>Welcome, {me.name}</h2>
               <p style={{ margin: 0, color: "var(--ink-muted)", fontSize: "0.92rem" }}>
-                Select a sales channel or open the barcode-driven inventory manager below.
+                Select a sales channel or launch the barcode-driven inventory manager below.
               </p>
             </div>
 
             <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "1.25rem" }}>
               {CHANNELS.map(([k, n]) => {
                 const count = open.filter(o => o.channel === k).length;
-                const icons = { dine_in: "🍽️", takeaway: "🛍️", delivery: "🛵" };
                 return (
                   <button className="tile" key={k} onClick={() => setView({ name: "layout", channel: k })} style={{ minHeight: "125px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                      <span style={{ fontSize: "1.8rem" }}>{icons[k] || "🏷️"}</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+                      <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "var(--brand-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-primary)" }}>
+                        {k === "dine_in" ? <IconDineIn size={20} /> : k === "takeaway" ? <IconTakeaway size={20} /> : <IconDelivery size={20} />}
+                      </div>
                       {count > 0 && (
                         <span style={{ background: "var(--gold-light)", color: "#92400e", fontWeight: 800, fontSize: "0.78rem", padding: "2px 8px", borderRadius: "999px" }}>
                           {count} Open
@@ -1556,7 +1576,9 @@ export default function App() {
               })}
 
               <button className="tile" onClick={() => setView({ name: "inventory" })} style={{ minHeight: "125px" }}>
-                <span style={{ fontSize: "1.8rem" }}>📦</span>
+                <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "var(--brand-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-primary)" }}>
+                  <IconInventory size={20} />
+                </div>
                 <div>
                   <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>Inventory & Stock</div>
                   <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Daily Bazar, Monthly Opening Stock & Ledger</span>
@@ -1564,7 +1586,9 @@ export default function App() {
               </button>
 
               <button className="tile" onClick={() => setView({ name: "table_editor" })} style={{ minHeight: "125px" }}>
-                <span style={{ fontSize: "1.8rem" }}>🗺️</span>
+                <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "var(--brand-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-primary)" }}>
+                  <IconFloorPlan size={20} />
+                </div>
                 <div>
                   <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>Floor Plan</div>
                   <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Interactive Table Layout</span>
@@ -1572,7 +1596,9 @@ export default function App() {
               </button>
 
               <button className="tile" onClick={report} style={{ minHeight: "125px" }}>
-                <span style={{ fontSize: "1.8rem" }}>📊</span>
+                <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "var(--brand-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-primary)" }}>
+                  <IconReports size={20} />
+                </div>
                 <div>
                   <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>Reports</div>
                   <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Mushak 6.3 & Cost Tracking</span>
@@ -1580,7 +1606,9 @@ export default function App() {
               </button>
 
               <button className="tile" onClick={() => setView({ name: "barcode_catalog" })} style={{ minHeight: "125px", border: "1.5px solid var(--brand-primary)", background: "rgba(79, 70, 229, 0.04)" }}>
-                <span style={{ fontSize: "1.8rem" }}>🏷️</span>
+                <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "var(--brand-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-primary)" }}>
+                  <IconBarcode size={20} />
+                </div>
                 <div>
                   <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>Barcode Catalog</div>
                   <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>31 Menu & 111 Ingredient Codes</span>
