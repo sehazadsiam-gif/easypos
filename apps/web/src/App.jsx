@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { getOutbox, queueOutbox, flushOutbox } from "./outbox";
+import { PracticeBazarView } from "./PracticeBazar";
+import { PrintableBarcodeSheet } from "./BarcodeSheet";
+import { InventorySuite } from "./InventorySuite";
 
 const api = async (path, token, body, method) => {
   const r = await fetch("/api" + path, {
@@ -57,6 +60,19 @@ function Login({ onLogin }) {
       />
       {err && <div style={{ color: "var(--red)", fontWeight: 600, fontSize: "0.9rem" }}>{err}</div>}
       <button className="primary" style={{ marginTop: "0.5rem", minHeight: "46px" }} onClick={go}>Sign In to Terminal</button>
+      
+      <div style={{ textAlign: "center", margin: "0.5rem 0" }}>
+        <button 
+          type="button" 
+          className="secondary" 
+          style={{ width: "100%", minHeight: "42px", fontWeight: 700 }} 
+          onClick={() => onLogin({ publicPractice: true })}
+        >
+          🛒 Open Daily Bazar (Practice Sandbox Mode)
+        </button>
+        <small style={{ color: "var(--gray)", fontSize: "0.78rem" }}>Public training sandbox · No login or PIN required</small>
+      </div>
+
       <div style={{ background: "var(--blue-light)", padding: "0.6rem 0.8rem", borderRadius: "8px", fontSize: "0.78rem", color: "var(--blue-primary)", marginTop: "0.5rem" }}>
         Demo Accounts: <b>1001</b> (Owner), <b>1002</b> (Manager), <b>1003</b> (Cashier) | Password: <b>admin123</b>
       </div>
@@ -406,6 +422,11 @@ function InventoryDailyBazarView({ token, onBack }) {
   const [qty, setQty] = useState("");
   const [cost, setCost] = useState("");
   const [wasteReason, setWasteReason] = useState("");
+  const [barcodeScan, setBarcodeScan] = useState("");
+  const [scannedCart, setScannedCart] = useState([]);
+  const [tripName, setTripName] = useState("Morning Bazar Trip");
+  const [shopperName, setShopperName] = useState("Staff");
+  const [showBarcodeSheet, setShowBarcodeSheet] = useState(false);
   const [msg, setMsg] = useState("");
 
   const refresh = async () => {
@@ -423,6 +444,74 @@ function InventoryDailyBazarView({ token, onBack }) {
   };
 
   useEffect(() => { refresh(); }, [token]);
+
+  const handleBarcodeScan = (codeRaw) => {
+    const code = codeRaw.trim().toUpperCase();
+    if (!code) return;
+
+    if (code.startsWith("QTY-")) {
+      if (scannedCart.length === 0) return setMsg("Scan ingredient first!");
+      const last = scannedCart[scannedCart.length - 1];
+      let newCount = last.pack_count;
+      if (code === "QTY-X1") newCount = 1;
+      else if (code === "QTY-X5") newCount = 5;
+      else if (code === "QTY-X10") newCount = 10;
+      else if (code === "QTY-X50") newCount = 50;
+      else if (code === "QTY-PLUS1KG") newCount += (1000 / (last.ing.pack_size || 1000));
+      else if (code === "QTY-PLUS5KG") newCount += (5000 / (last.ing.pack_size || 1000));
+
+      const updated = [...scannedCart];
+      updated[scannedCart.length - 1] = {
+        ...last,
+        pack_count: newCount,
+        total_cost: Math.round(newCount * last.unit_cost)
+      };
+      setScannedCart(updated);
+      setBarcodeScan("");
+      return;
+    }
+
+    const matched = inventory.find(i => (i.barcode && i.barcode.toUpperCase() === code) || i.id.toString() === code);
+    if (matched) {
+      const existing = scannedCart.findIndex(c => c.ing.id === matched.id);
+      if (existing >= 0) {
+        const updated = [...scannedCart];
+        updated[existing].pack_count += 1;
+        updated[existing].total_cost = Math.round(updated[existing].pack_count * updated[existing].unit_cost);
+        setScannedCart(updated);
+      } else {
+        const estCost = Math.round((matched.cost_per_unit || 10) * (matched.pack_size || 1000));
+        setScannedCart(prev => [...prev, { ing: matched, pack_count: 1, unit_cost: estCost, total_cost: estCost }]);
+      }
+      setMsg(`Scanned into production bazar: ${matched.name}`);
+    } else {
+      setMsg(`No ingredient matching barcode ${code}`);
+    }
+    setBarcodeScan("");
+  };
+
+  const approveProductionTrip = async () => {
+    if (scannedCart.length === 0) return setMsg("Scanned trip is empty!");
+    const payload = {
+      trip_name: tripName,
+      shopper_name: shopperName,
+      lines: scannedCart.map(c => ({
+        ingredient_id: c.ing.id,
+        pack_count: c.pack_count,
+        unit_cost: c.unit_cost,
+        total_cost: c.total_cost
+      }))
+    };
+
+    try {
+      await api("/inventory/bazar-trips", token, payload);
+      alert("Production Daily Bazar Trip approved and atomic stock incremented!");
+      setScannedCart([]);
+      refresh();
+    } catch (e) {
+      setMsg(e.message);
+    }
+  };
 
   const recordBazar = async () => {
     if (!qty || !cost) return setMsg("Enter quantity and cost");
@@ -452,30 +541,135 @@ function InventoryDailyBazarView({ token, onBack }) {
     } catch (e) { setMsg(e.message); }
   };
 
+  if (showBarcodeSheet) {
+    return <PrintableBarcodeSheet items={inventory} onBack={() => setShowBarcodeSheet(false)} />;
+  }
+
   return (
     <div className="card">
       <div className="row">
         <h2 style={{ margin: 0, color: "var(--blue-primary)" }}>Inventory & Stock Management</h2>
-        <button onClick={onBack}>Back to POS</button>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button className="secondary" onClick={() => setShowBarcodeSheet(true)}>🖨 Print Ingredient Barcodes</button>
+          <button onClick={onBack}>Back to POS</button>
+        </div>
       </div>
 
       <div className="nav-tabs" style={{ marginTop: "1rem" }}>
+        <button className={tab === "scanner" ? "active" : ""} onClick={() => setTab("scanner")}>📷 Production Barcode Scanner</button>
         <button className={tab === "inventory" ? "active" : ""} onClick={() => setTab("inventory")}>Stock Levels</button>
-        <button className={tab === "bazar" ? "active" : ""} onClick={() => setTab("bazar")}>Daily Bazar Entry</button>
+        <button className={tab === "bazar" ? "active" : ""} onClick={() => setTab("bazar")}>Manual Bazar Entry</button>
         <button className={tab === "wastage" ? "active" : ""} onClick={() => setTab("wastage")}>Wastage / Adjustment</button>
         <button className={tab === "movements" ? "active" : ""} onClick={() => setTab("movements")}>Stock Movement Ledger</button>
       </div>
 
-      {msg && <p style={{ color: "var(--green)", fontWeight: 600 }}>{msg}</p>}
+      {msg && <p style={{ color: "var(--blue-primary)", background: "var(--blue-light)", padding: "0.5rem", borderRadius: "6px", fontWeight: 600 }}>{msg}</p>}
+
+      {tab === "scanner" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "1rem" }}>
+          <div>
+            <div className="card" style={{ marginBottom: "1rem", border: "2px solid var(--blue-primary)" }}>
+              <h3>Production Barcode Scanner Receiver</h3>
+              <p style={{ color: "var(--gray)", fontSize: "0.85rem", margin: "0 0 0.5rem 0" }}>
+                Auto-focus active. Trigger your handheld barcode gun on ingredient packages or use modifier codes.
+              </p>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  placeholder="Scan barcode or type ING-MILK-1L / QTY-X5"
+                  style={{ flex: 1, fontSize: "1.05rem", padding: "0.65rem", border: "2px solid var(--blue-primary)", borderRadius: "6px" }}
+                  value={barcodeScan}
+                  onChange={e => setBarcodeScan(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleBarcodeScan(barcodeScan)}
+                />
+                <button className="primary" onClick={() => handleBarcodeScan(barcodeScan)}>Enter</button>
+              </div>
+
+              <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "0.8rem", color: "var(--gray)" }}>Quick Modifiers:</span>
+                {["QTY-X1", "QTY-X5", "QTY-X10", "QTY-X50", "QTY-PLUS1KG", "QTY-PLUS5KG"].map(q => (
+                  <button key={q} className="secondary" style={{ padding: "0.1rem 0.5rem", minHeight: "26px", fontSize: "0.75rem" }} onClick={() => handleBarcodeScan(q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="row">
+                <h4>Scanned Production Items ({scannedCart.length})</h4>
+                {scannedCart.length > 0 && <button className="warn" style={{ minHeight: "28px", padding: "0.1rem 0.5rem" }} onClick={() => setScannedCart([])}>Clear</button>}
+              </div>
+              {scannedCart.length === 0 ? <p style={{ color: "var(--gray)" }}>Scan barcodes to build morning check-in trip.</p> : (
+                <table className="data-table">
+                  <thead>
+                    <tr><th>Ingredient</th><th>Pack Size</th><th>Packs</th><th>Cost Paid</th><th>Action</th></tr>
+                  </thead>
+                  <tbody>
+                    {scannedCart.map((c, idx) => (
+                      <tr key={idx}>
+                        <td><b>{c.ing.name}</b> <br /><small style={{ color: "var(--gray)" }}>{c.ing.barcode}</small></td>
+                        <td>{c.ing.pack_unit || "pack"}</td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                            <button style={{ minHeight: "24px", padding: "0.1rem 0.4rem" }} onClick={() => {
+                              const u = [...scannedCart]; u[idx].pack_count = Math.max(1, u[idx].pack_count - 1);
+                              u[idx].total_cost = Math.round(u[idx].pack_count * u[idx].unit_cost); setScannedCart(u);
+                            }}>−</button>
+                            <b>{c.pack_count}</b>
+                            <button style={{ minHeight: "24px", padding: "0.1rem 0.4rem" }} onClick={() => {
+                              const u = [...scannedCart]; u[idx].pack_count += 1;
+                              u[idx].total_cost = Math.round(u[idx].pack_count * u[idx].unit_cost); setScannedCart(u);
+                            }}>+</button>
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            style={{ width: "80px", padding: "0.2rem" }}
+                            value={(c.total_cost / 100).toFixed(0)}
+                            onChange={e => {
+                              const val = Math.round(parseFloat(e.target.value || "0") * 100);
+                              const u = [...scannedCart]; u[idx].total_cost = val;
+                              u[idx].unit_cost = Math.round(val / (c.pack_count || 1)); setScannedCart(u);
+                            }}
+                          />
+                        </td>
+                        <td><button className="warn" style={{ minHeight: "24px", padding: "0.1rem 0.4rem" }} onClick={() => setScannedCart(scannedCart.filter((_, i) => i !== idx))}>✕</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <h3>Approve Production Trip</h3>
+            <p><label style={{ fontSize: "0.85rem" }}>Trip Label</label>
+              <input style={{ width: "100%" }} value={tripName} onChange={e => setTripName(e.target.value)} />
+            </p>
+            <p><label style={{ fontSize: "0.85rem" }}>Shopper / Staff</label>
+              <input style={{ width: "100%" }} value={shopperName} onChange={e => setShopperName(e.target.value)} />
+            </p>
+            <div className="sum">
+              <div className="row"><span>Total Payable</span><b>{tk(scannedCart.reduce((s, c) => s + c.total_cost, 0))}</b></div>
+            </div>
+            <button className="primary" style={{ width: "100%", marginTop: "1rem", minHeight: "44px" }} onClick={approveProductionTrip}>
+              Approve & Receive Stock
+            </button>
+          </div>
+        </div>
+      )}
 
       {tab === "inventory" && (
         <table className="data-table">
           <thead>
-            <tr><th>Ingredient</th><th>Unit</th><th>Current Stock</th><th>Cost/Unit</th></tr>
+            <tr><th>Barcode</th><th>Ingredient</th><th>Unit</th><th>Current Stock</th><th>Cost/Unit</th></tr>
           </thead>
           <tbody>
             {inventory.map(i => (
               <tr key={i.id}>
+                <td><code>{i.barcode || "N/A"}</code></td>
                 <td><b>{i.name}</b></td>
                 <td>{i.unit}</td>
                 <td><span style={{ fontWeight: 600 }}>{i.current_stock}</span> {i.unit}</td>
@@ -697,6 +891,7 @@ export default function App() {
   }, [token, view.name]);
 
   if (!me) return <Login onLogin={setMe} />;
+  if (me.publicPractice) return <PracticeBazarView onExitToPOS={() => setMe(null)} />;
 
   const home = () => setView({ name: "home" });
 
@@ -745,6 +940,9 @@ export default function App() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <button className="secondary" style={{ minHeight: "36px", padding: "0.3rem 0.8rem", fontWeight: 700 }} onClick={() => setView({ name: "practice_bazar" })}>
+            🛒 Practice Sandbox
+          </button>
           <span style={{ fontSize: "0.88rem" }}>
             {shift ? <span style={{ color: "var(--blue-primary)", fontWeight: 600 }}>{shift.label} ({tk(shift.opening_cash)})</span> : "No shift open"} · {me.name} ({me.role})
           </span>
@@ -877,7 +1075,8 @@ export default function App() {
           />
         )}
 
-        {view.name === "inventory" && <InventoryDailyBazarView token={token} onBack={home} />}
+        {view.name === "inventory" && <InventorySuite token={token} api={api} userRole={me.role} onBack={home} />}
+        {view.name === "practice_bazar" && <PracticeBazarView onExitToPOS={home} />}
         {view.name === "table_editor" && <TableLayoutEditor token={token} onBack={home} />}
       </main>
     </>
