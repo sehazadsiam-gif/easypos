@@ -50,7 +50,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-easypos}:${POSTGRES_PASSWORD:-easypos_secure_pass}@db:5432/${POSTGRES_DB:-easypos}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-easypos}:${POSTGRES_PASSWORD:-easypos_secure_pass}@db:5432/${POSTGRES_DB:-easypos}}
       JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-in-production}
       VAT_PCT: ${VAT_PCT:-5}
       SERVICE_PCT: ${SERVICE_PCT:-10}
@@ -58,6 +58,7 @@ services:
       - "8000"
     networks:
       - default
+      - coolify
 
 volumes:
   pgdata:

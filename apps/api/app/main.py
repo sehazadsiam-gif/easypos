@@ -37,7 +37,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-seed()
+try:
+    seed()
+except Exception as _seed_err:
+    import logging
+    logging.getLogger("easypos.seed").error(f"Seeding warning: {_seed_err}")
 
 @app.get("/config")
 @app.get("/api/config")

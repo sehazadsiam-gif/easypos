@@ -1,7 +1,7 @@
 import json
 from datetime import date
 from sqlalchemy import text
-from app.database import Base, engine, Session
+from app.database import Base, engine, Session, wait_for_db
 from app.models import (
     Tenant, Branch, Terminal, User, Item, Ingredient,
     Recipe, RecipeItem, TableLayout,
@@ -40,6 +40,7 @@ CROWN_RECIPES = {'Japanese Tori Karaage': [{'ingredient': 'Chicken thigh (bonele
 
 
 def seed():
+    wait_for_db()
     Base.metadata.create_all(engine)
     _ensure_sqlite_columns()
     db = Session()
