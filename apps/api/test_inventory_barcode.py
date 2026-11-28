@@ -344,3 +344,38 @@ def test_owner_edit_and_delete_menu_ingredient_and_batch():
     # 4. Delete ingredient with owner password
     assert client.post(f"/inventory/{ing_id}/delete", json={}, headers=owner_h).status_code == 403
     assert client.post(f"/inventory/{ing_id}/delete", json={"owner_password": "258000"}, headers=owner_h).status_code == 200
+
+
+def test_pos_order_deducts_stock_ledger_in_inventory():
+    owner_h = get_headers("owner")
+
+    # Ensure shift is open
+    client.post("/shifts/open", json={"label": "Test Shift", "opening_cash": 0}, headers=owner_h)
+
+    bc_i = f"ING-POS-{uuid.uuid4().hex[:5].upper()}"
+    ing_id = client.post("/inventory", json={"name": "POS Beans", "unit": "g", "barcode": bc_i, "pack_size": 100, "min_stock": 10}, headers=owner_h).json()["id"]
+    bc_m = f"MENU-POS-{uuid.uuid4().hex[:5].upper()}"
+    menu_id = client.post("/items", json={"name": "POS Espresso", "barcode": bc_m, "price": 18000, "station": "bar"}, headers=owner_h).json()["id"]
+
+    client.post(f"/recipes/{menu_id}/draft", json={"ingredients": [{"bazar_item_id": ing_id, "amount": 10, "unit": "g"}]}, headers=owner_h)
+    client.post(f"/recipes/{menu_id}/approve", headers=owner_h)
+
+    # Add 100g via Daily Bazar
+    bb = client.post("/batches", json={"batch_type": "bazar"}, headers=owner_h).json()["id"]
+    client.put(f"/batches/{bb}/lines", json={"lines": [{"bazar_item_id": ing_id, "quantity": 100, "pack_count": 1}]}, headers=owner_h)
+    client.post(f"/batches/{bb}/approve", json={}, headers=owner_h)
+
+    # Sell 3x via POS Order -> must deduct 30g from StockLedger & Inventory Summary
+    r_ord = client.post("/orders", json={
+        "client_uuid": str(uuid.uuid4()),
+        "channel": "takeaway",
+        "slot": "1",
+        "lines": [{"item_id": menu_id, "qty": 3}],
+    }, headers=owner_h)
+    assert r_ord.status_code == 200
+
+    inv = client.get("/inventory", headers=owner_h).json()
+    item = next(x for x in inv if x["id"] == ing_id)
+    assert item["bazar_total"] == 100
+    assert item["sale_total"] == 30
+    assert item["current_stock"] == 70

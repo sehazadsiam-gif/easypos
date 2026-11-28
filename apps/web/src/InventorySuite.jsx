@@ -479,10 +479,31 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
       });
       setActiveBatch(approved);
       setLines(approved.lines || []);
-      setMsg({ text: `${label} Batch #${approved.id} APPROVED and locked in ledger!`, type: "info" });
+      setMsg({ text: `${label} Batch #${approved.id} APPROVED and deducted from inventory!`, type: "info" });
       loadData();
       onChanged?.();
     } catch (e) {
+      if (isSale && !allowNegative && e.message && e.message.toLowerCase().includes("not enough stock")) {
+        if (window.confirm(`${e.message}\n\nSome ingredients have 0 or low stock. Approve Daily Sale anyway and deduct into negative stock?`)) {
+          try {
+            setAllowNegative(true);
+            const approved = await api(`/batches/${activeBatch.id}/approve`, token, {
+              allow_negative_stock: true,
+            });
+            setActiveBatch(approved);
+            setLines(approved.lines || []);
+            setMsg({ text: `${label} Batch #${approved.id} APPROVED (with negative stock override) and deducted from inventory!`, type: "info" });
+            loadData();
+            onChanged?.();
+            refocusScan();
+            return;
+          } catch (e2) {
+            setMsg({ text: e2.message, type: "error" });
+            refocusScan();
+            return;
+          }
+        }
+      }
       setMsg({ text: e.message, type: "error" });
     }
     refocusScan();

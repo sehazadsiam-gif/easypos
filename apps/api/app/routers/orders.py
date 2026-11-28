@@ -86,7 +86,7 @@ def create_order(b: OrderIn, u=Depends(auth), db=Depends(get_db)):
         db.flush()
 
         generate_print_jobs(db, t, o, lines)
-        deduct_inventory_for_order(db, t, o.id)
+        deduct_inventory_for_order(db, t, o.id, user_id=u.get("uid"))
         db.commit()
         return ser(o, db)
     except HTTPException:

@@ -1,19 +1,36 @@
 import json
 from datetime import datetime
 from typing import List
-from app.models import Order, Line, PrintJob, RecipeItem, Ingredient, StockMovement
+from app.models import Order, Line, PrintJob, RecipeItem, Ingredient, StockMovement, StockLedger
+from app.services.inventory_service import get_approved_recipe, today_str
 
-def deduct_inventory_for_order(db, tenant_id: int, order_id: int):
-    """Auto-deduct raw ingredient stock and record StockMovement."""
+def deduct_inventory_for_order(db, tenant_id: int, order_id: int, user_id: int = None):
+    """Auto-deduct raw ingredient stock into StockLedger (append-only) and StockMovement."""
     lines = db.query(Line).filter_by(tenant_id=tenant_id, order_id=order_id).all()
+    order_date = today_str()
     for line in lines:
-        recipes = db.query(RecipeItem).filter_by(tenant_id=tenant_id, item_id=line.item_id).all()
+        approved_rec = get_approved_recipe(db, tenant_id, line.item_id)
+        if approved_rec:
+            recipes = db.query(RecipeItem).filter_by(tenant_id=tenant_id, recipe_id=approved_rec.id).all()
+        else:
+            recipes = db.query(RecipeItem).filter_by(tenant_id=tenant_id, item_id=line.item_id).all()
         for r in recipes:
             ing = db.query(Ingredient).filter_by(tenant_id=tenant_id, id=r.ingredient_id).first()
             if ing:
                 used = (r.qty or 0) * (line.qty or 0)
-                ing.current_stock = max(0, (ing.current_stock or 0) - used)
+                if used <= 0:
+                    continue
+                ing.current_stock = (ing.current_stock or 0) - used
                 cost = (ing.cost_per_unit or 0) * used
+                db.add(StockLedger(
+                    tenant_id=tenant_id,
+                    bazar_item_id=ing.id,
+                    quantity=-used,
+                    type="sale",
+                    date=order_date,
+                    reason=f"POS Sale Order #{order_id} ({line.qty}x {line.name})",
+                    created_by=user_id,
+                ))
                 db.add(StockMovement(
                     tenant_id=tenant_id,
                     ingredient_id=ing.id,
@@ -22,7 +39,8 @@ def deduct_inventory_for_order(db, tenant_id: int, order_id: int):
                     unit=ing.unit or "g",
                     cost_paisa=cost,
                     ref_order_id=order_id,
-                    reason=f"Sale order #{order_id} ({line.qty}x {line.name})"
+                    reason=f"Sale order #{order_id} ({line.qty}x {line.name})",
+                    created_by=user_id,
                 ))
 
 def generate_print_jobs(db, tenant_id: int, order: Order, lines: List[Line], reprint: bool = False):
