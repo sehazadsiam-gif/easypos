@@ -1737,7 +1737,7 @@ export default function App() {
                 </div>
                 <div>
                   <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--brand-primary)" }}>Barcode Catalog</div>
-                  <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>31 Menu & 111 Ingredient Codes</span>
+                  <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>Menu, Beverages & Ingredient Codes</span>
                 </div>
               </button>
             </div>

@@ -1,0 +1,153 @@
+"""Crown Coffee Uttara — Coffee & Beverages Menu, Bazar Ingredients, and Approved Recipes.
+All items route to station='bar' so KOTs print automatically on the Bar Printer.
+"""
+
+BEVERAGE_INGREDIENTS = [
+    {"name": "Coffee bean", "barcode": "ING-COFFEE-BEAN-G", "unit": "g", "pack_size": 100, "pack_unit": "100gm", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Water", "barcode": "ING-WATER-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Sprite", "barcode": "ING-SPRITE-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Ice cube", "barcode": "ING-ICE-CUBE-PCS", "unit": "pcs", "pack_size": 1, "pack_unit": "pcs", "min_stock": 50, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Lemon slice", "barcode": "ING-LEMON-SLICE-PCS", "unit": "pcs", "pack_size": 1, "pack_unit": "pcs", "min_stock": 20, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Hazelnut syrup", "barcode": "ING-HAZELNUT-SYR-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Caramel syrup", "barcode": "ING-CARAMEL-SYR-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Vanilla syrup", "barcode": "ING-VANILLA-SYR-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Chocolate syrup", "barcode": "ING-CHOCO-SYR-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Salted caramel syrup", "barcode": "ING-SALTED-CAR-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Tiramisu syrup", "barcode": "ING-TIRAMISU-SYR-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Raspberry mocha syrup", "barcode": "ING-RASP-MOCHA-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Blue Ocean syrup", "barcode": "ING-BLUE-OCEAN-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Sea Breeze syrup", "barcode": "ING-SEA-BREEZE-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Strawberry Splash syrup", "barcode": "ING-STRAW-SPLASH-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Mango syrup", "barcode": "ING-MANGO-SYR-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Green Apple syrup", "barcode": "ING-GREEN-APPLE-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Berry Mojito syrup", "barcode": "ING-BERRY-MOJITO-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Raspberry syrup", "barcode": "ING-RASPBERRY-SY-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Popcorn syrup", "barcode": "ING-POPCORN-SYR-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Orange", "barcode": "ING-ORANGE-G", "unit": "g", "pack_size": 100, "pack_unit": "100gm", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Pineapple", "barcode": "ING-PINEAPPLE-G", "unit": "g", "pack_size": 100, "pack_unit": "100gm", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Papaya", "barcode": "ING-PAPAYA-G", "unit": "g", "pack_size": 100, "pack_unit": "100gm", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "KitKat", "barcode": "ING-KITKAT-PCS", "unit": "pcs", "pack_size": 1, "pack_unit": "pcs", "min_stock": 10, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Oreo biscuits", "barcode": "ING-OREO-BISC-PCS", "unit": "pcs", "pack_size": 1, "pack_unit": "pcs", "min_stock": 10, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Nutella chocolate", "barcode": "ING-NUTELLA-G", "unit": "g", "pack_size": 100, "pack_unit": "100gm", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Frappe powder vanilla", "barcode": "ING-FRAPPE-VAN-G", "unit": "g", "pack_size": 100, "pack_unit": "100gm", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Frappe powder chocolate", "barcode": "ING-FRAPPE-CHOC-G", "unit": "g", "pack_size": 100, "pack_unit": "100gm", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Whipping cream", "barcode": "ING-WHIP-CREAM-ML", "unit": "ml", "pack_size": 100, "pack_unit": "100ml", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+    {"name": "Powder milk", "barcode": "ING-POWDER-MILK-G", "unit": "g", "pack_size": 100, "pack_unit": "100gm", "min_stock": 100, "current_stock": 0, "cost_per_unit": 0},
+]
+
+BEVERAGE_ITEMS = [
+    # Hot Coffee (15)
+    {"category": "Hot Coffee", "name": "Espresso Single", "barcode": "MENU-ESPRESSO-SGL", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Espresso Double", "barcode": "MENU-ESPRESSO-DBL", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Americano", "barcode": "MENU-AMERICANO", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Cappuccino", "barcode": "MENU-CAPPUCCINO", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Latte", "barcode": "MENU-LATTE", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Hazelnut Latte", "barcode": "MENU-HAZELNUT-LAT", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Caramel Latte", "barcode": "MENU-CARAMEL-LAT", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Vanilla Latte", "barcode": "MENU-VANILLA-LAT", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Mocha Latte", "barcode": "MENU-MOCHA-LAT", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Salted Caramel Latte", "barcode": "MENU-SALT-CAR-LAT", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Tiramisu Latte", "barcode": "MENU-TIRAMISU-LAT", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Flat White Latte", "barcode": "MENU-FLAT-WHITE", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Affogato", "barcode": "MENU-AFFOGATO", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Cappuccino Small", "barcode": "MENU-CAPPUC-SML", "price": None, "station": "bar"},
+    {"category": "Hot Coffee", "name": "Ginger Americano", "barcode": "MENU-GINGER-AMER", "price": None, "station": "bar"},
+    # Iced Coffee (9)
+    {"category": "Iced Coffee", "name": "Lemon Espresso Tonic", "barcode": "MENU-LEMON-ESP-TN", "price": None, "station": "bar"},
+    {"category": "Iced Coffee", "name": "Iced Ginger Americano", "barcode": "MENU-ICED-GING-AM", "price": None, "station": "bar"},
+    {"category": "Iced Coffee", "name": "Iced Cappuccino", "barcode": "MENU-ICED-CAPPUC", "price": None, "station": "bar"},
+    {"category": "Iced Coffee", "name": "Iced Latte", "barcode": "MENU-ICED-LATTE", "price": None, "station": "bar"},
+    {"category": "Iced Coffee", "name": "Iced Mocha Latte", "barcode": "MENU-ICED-MOCHA", "price": None, "station": "bar"},
+    {"category": "Iced Coffee", "name": "Iced Hazelnut Latte", "barcode": "MENU-ICED-HAZEL", "price": None, "station": "bar"},
+    {"category": "Iced Coffee", "name": "Iced Caramel Latte", "barcode": "MENU-ICED-CARAMEL", "price": None, "station": "bar"},
+    {"category": "Iced Coffee", "name": "Iced Vanilla Latte", "barcode": "MENU-ICED-VANILLA", "price": None, "station": "bar"},
+    {"category": "Iced Coffee", "name": "Iced Raspberry Mocha", "barcode": "MENU-ICED-RASP-MC", "price": None, "station": "bar"},
+    # Mojitos & Mocktails (9)
+    {"category": "Mojitos & Mocktails", "name": "Mint Lemonade", "barcode": "MENU-MINT-LEMON", "price": None, "station": "bar"},
+    {"category": "Mojitos & Mocktails", "name": "Virgin Mojito", "barcode": "MENU-VIRGIN-MOJ", "price": None, "station": "bar"},
+    {"category": "Mojitos & Mocktails", "name": "Blue Ocean Mojito", "barcode": "MENU-BLUE-OCEAN", "price": None, "station": "bar"},
+    {"category": "Mojitos & Mocktails", "name": "Sea Breeze Mojito", "barcode": "MENU-SEA-BREEZE", "price": None, "station": "bar"},
+    {"category": "Mojitos & Mocktails", "name": "Strawberry Splash", "barcode": "MENU-STRAW-SPLASH", "price": None, "station": "bar"},
+    {"category": "Mojitos & Mocktails", "name": "Mango Lemonade", "barcode": "MENU-MANGO-LEMON", "price": None, "station": "bar"},
+    {"category": "Mojitos & Mocktails", "name": "Green Apple Mojito", "barcode": "MENU-GREEN-APPLE", "price": None, "station": "bar"},
+    {"category": "Mojitos & Mocktails", "name": "Berry Mojito", "barcode": "MENU-BERRY-MOJITO", "price": None, "station": "bar"},
+    {"category": "Mojitos & Mocktails", "name": "Raspberry Freezer", "barcode": "MENU-RASP-FREEZER", "price": None, "station": "bar"},
+    # Fresh Juices (3)
+    {"category": "Fresh Juices", "name": "Orange Juice", "barcode": "MENU-ORANGE-JUICE", "price": None, "station": "bar"},
+    {"category": "Fresh Juices", "name": "Pineapple Juice", "barcode": "MENU-PINE-JUICE", "price": None, "station": "bar"},
+    {"category": "Fresh Juices", "name": "Papaya Juice", "barcode": "MENU-PAPAYA-JUICE", "price": None, "station": "bar"},
+    # Shakes (7)
+    {"category": "Shakes", "name": "KitKat Shake", "barcode": "MENU-KITKAT-SHAKE", "price": None, "station": "bar"},
+    {"category": "Shakes", "name": "Oreo Shake", "barcode": "MENU-OREO-SHAKE", "price": None, "station": "bar"},
+    {"category": "Shakes", "name": "Strawberry Shake", "barcode": "MENU-STRAW-SHAKE", "price": None, "station": "bar"},
+    {"category": "Shakes", "name": "Chocolate Shake", "barcode": "MENU-CHOCO-SHAKE", "price": None, "station": "bar"},
+    {"category": "Shakes", "name": "Vanilla Shake", "barcode": "MENU-VAN-SHAKE", "price": None, "station": "bar"},
+    {"category": "Shakes", "name": "Nutella Shake", "barcode": "MENU-NUTELLA-SHK", "price": None, "station": "bar"},
+    {"category": "Shakes", "name": "Mango Shake", "barcode": "MENU-MANGO-SHAKE", "price": None, "station": "bar"},
+    # Frappes & Chocolate (4)
+    {"category": "Frappes & Chocolate", "name": "Vanilla Frappe", "barcode": "MENU-VAN-FRAPPE", "price": None, "station": "bar"},
+    {"category": "Frappes & Chocolate", "name": "Chocolate Frappe", "barcode": "MENU-CHOCO-FRAPPE", "price": None, "station": "bar"},
+    {"category": "Frappes & Chocolate", "name": "Melted Chocolate", "barcode": "MENU-MELTED-CHOC", "price": None, "station": "bar"},
+    {"category": "Frappes & Chocolate", "name": "Frozen Chocolate", "barcode": "MENU-FROZEN-CHOC", "price": None, "station": "bar"},
+]
+
+
+def _l(ingredient: str, qty: int, unit: str):
+    return {"ingredient": ingredient, "qty": qty, "input_amount": float(qty), "input_unit": unit}
+
+
+BEVERAGE_RECIPES = {
+    # Hot Coffee
+    "Espresso Single": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml")],
+    "Espresso Double": [_l("Coffee bean", 16, "g"), _l("Water", 60, "ml")],
+    "Americano": [_l("Coffee bean", 8, "g"), _l("Water", 170, "ml")],
+    "Cappuccino": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 125, "ml")],
+    "Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 200, "ml")],
+    "Hazelnut Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 200, "ml"), _l("Hazelnut syrup", 20, "ml")],
+    "Caramel Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 200, "ml"), _l("Caramel syrup", 20, "ml")],
+    "Vanilla Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 200, "ml"), _l("Vanilla syrup", 20, "ml")],
+    "Mocha Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 200, "ml"), _l("Chocolate syrup", 20, "ml")],
+    "Salted Caramel Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 200, "ml"), _l("Salted caramel syrup", 20, "ml")],
+    "Tiramisu Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 200, "ml"), _l("Tiramisu syrup", 20, "ml")],
+    "Flat White Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 200, "ml")],
+    "Affogato": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Vanilla ice cream", 100, "g")],
+    "Cappuccino Small": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 95, "ml")],
+    "Ginger Americano": [_l("Coffee bean", 8, "g"), _l("Water", 170, "ml"), _l("Ginger", 10, "g")],
+    # Iced Coffee (Espresso Single = 8g coffee bean + 30ml water)
+    "Lemon Espresso Tonic": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Lemon juice", 30, "ml"), _l("Sprite", 250, "ml"), _l("Ice cube", 7, "pcs")],
+    "Iced Ginger Americano": [_l("Coffee bean", 8, "g"), _l("Ginger", 10, "g"), _l("Water", 280, "ml"), _l("Ice cube", 7, "pcs")],
+    "Iced Cappuccino": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 250, "ml"), _l("Ice cube", 7, "pcs")],
+    "Iced Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 250, "ml"), _l("Ice cube", 7, "pcs")],
+    "Iced Mocha Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 250, "ml"), _l("Ice cube", 7, "pcs"), _l("Chocolate syrup", 30, "ml")],
+    "Iced Hazelnut Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 250, "ml"), _l("Ice cube", 7, "pcs"), _l("Hazelnut syrup", 30, "ml")],
+    "Iced Caramel Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 250, "ml"), _l("Ice cube", 7, "pcs"), _l("Caramel syrup", 30, "ml")],
+    "Iced Vanilla Latte": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 250, "ml"), _l("Ice cube", 7, "pcs"), _l("Vanilla syrup", 30, "ml")],
+    "Iced Raspberry Mocha": [_l("Coffee bean", 8, "g"), _l("Water", 30, "ml"), _l("Milk", 250, "ml"), _l("Ice cube", 7, "pcs"), _l("Raspberry mocha syrup", 30, "ml")],
+    # Mojitos & Mocktails
+    "Mint Lemonade": [_l("Mint", 15, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Sprite", 250, "ml"), _l("Lemon juice", 30, "ml")],
+    "Virgin Mojito": [_l("Mint", 5, "g"), _l("Brown sugar", 5, "g"), _l("Ice cube", 7, "pcs"), _l("Sprite", 250, "ml"), _l("Lemon slice", 3, "pcs")],
+    "Blue Ocean Mojito": [_l("Mint", 5, "g"), _l("Blue Ocean syrup", 30, "ml"), _l("Ice cube", 7, "pcs"), _l("Sprite", 250, "ml"), _l("Lemon slice", 3, "pcs")],
+    "Sea Breeze Mojito": [_l("Mint", 5, "g"), _l("Sea Breeze syrup", 30, "ml"), _l("Ice cube", 7, "pcs"), _l("Sprite", 250, "ml"), _l("Lemon slice", 3, "pcs")],
+    "Strawberry Splash": [_l("Mint", 5, "g"), _l("Strawberry Splash syrup", 30, "ml"), _l("Ice cube", 7, "pcs"), _l("Sprite", 250, "ml"), _l("Lemon slice", 3, "pcs")],
+    "Mango Lemonade": [_l("Sugar", 15, "g"), _l("Mango syrup", 30, "ml"), _l("Ice cube", 7, "pcs"), _l("Water", 250, "ml"), _l("Lemon juice", 30, "ml")],
+    "Green Apple Mojito": [_l("Mint", 5, "g"), _l("Green Apple syrup", 30, "ml"), _l("Ice cube", 7, "pcs"), _l("Sprite", 250, "ml"), _l("Lemon slice", 3, "pcs")],
+    "Berry Mojito": [_l("Mint", 5, "g"), _l("Berry Mojito syrup", 30, "ml"), _l("Ice cube", 7, "pcs"), _l("Sprite", 250, "ml"), _l("Lemon slice", 3, "pcs")],
+    "Raspberry Freezer": [_l("Mint", 5, "g"), _l("Raspberry syrup", 30, "ml"), _l("Ice cube", 7, "pcs"), _l("Sprite", 250, "ml"), _l("Lemon slice", 3, "pcs")],
+    # Fresh Juices
+    "Orange Juice": [_l("Orange", 200, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Water", 250, "ml")],
+    "Pineapple Juice": [_l("Pineapple", 150, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Water", 250, "ml")],
+    "Papaya Juice": [_l("Papaya", 150, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Water", 250, "ml")],
+    # Shakes
+    "KitKat Shake": [_l("Vanilla ice cream", 200, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Milk", 60, "ml"), _l("KitKat", 3, "pcs")],
+    "Oreo Shake": [_l("Vanilla ice cream", 200, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Milk", 60, "ml"), _l("Oreo biscuits", 3, "pcs")],
+    "Strawberry Shake": [_l("Vanilla ice cream", 200, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Milk", 60, "ml")],
+    "Chocolate Shake": [_l("Vanilla ice cream", 200, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Milk", 60, "ml")],
+    "Vanilla Shake": [_l("Vanilla ice cream", 200, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Milk", 60, "ml")],
+    "Nutella Shake": [_l("Vanilla ice cream", 200, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Milk", 60, "ml"), _l("Nutella chocolate", 30, "g")],
+    "Mango Shake": [_l("Vanilla ice cream", 200, "g"), _l("Sugar", 15, "g"), _l("Ice cube", 7, "pcs"), _l("Milk", 60, "ml")],
+    # Frappes & Chocolate
+    "Vanilla Frappe": [_l("Frappe powder vanilla", 30, "g"), _l("Salted caramel syrup", 15, "ml"), _l("Popcorn syrup", 15, "ml"), _l("Ice cube", 7, "pcs"), _l("Whipping cream", 40, "ml"), _l("Milk", 60, "ml")],
+    "Chocolate Frappe": [_l("Frappe powder chocolate", 30, "g"), _l("Salted caramel syrup", 15, "ml"), _l("Popcorn syrup", 15, "ml"), _l("Ice cube", 7, "pcs"), _l("Whipping cream", 40, "ml"), _l("Milk", 60, "ml")],
+    "Melted Chocolate": [_l("Dark chocolate", 30, "g"), _l("Powder milk", 15, "g"), _l("Milk", 250, "ml")],
+    "Frozen Chocolate": [_l("Dark chocolate", 30, "g"), _l("Ice cube", 7, "pcs"), _l("Powder milk", 15, "g"), _l("Milk", 250, "ml")],
+}
