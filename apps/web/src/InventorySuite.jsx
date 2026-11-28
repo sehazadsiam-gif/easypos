@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { PrintableBarcodeSheet, BarcodeSvg } from "./BarcodeSheet";
 import { CameraScannerModal } from "./CameraScanner";
-import { IconAlert, IconClose, IconCheck, IconEdit, IconPlus, IconPrinter, IconSearch, IconArrowLeft, IconLock, IconCamera } from "./Icons";
+import { IconAlert, IconClose, IconCheck, IconEdit, IconPlus, IconPrinter, IconSearch, IconArrowLeft, IconLock, IconCamera, IconDownload } from "./Icons";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -468,7 +468,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
       setMsg({ text: "Scan at least one item before approving.", type: "error" });
       return;
     }
-    const label = batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale";
+    const label = batchType === "central" ? "Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale";
     if (!window.confirm(`Confirm APPROVE ${label} Batch #${activeBatch.id}? Approved batches cannot be edited or deleted.`)) {
       refocusScan();
       return;
@@ -499,7 +499,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
           <div className="row" style={{ marginBottom: "0.75rem", flexWrap: "wrap" }}>
             <div>
               <h3 style={{ margin: 0, color: "var(--blue-primary)" }}>
-                {batchType === "central" && "Monthly Opening Stock (Starting Count)"}
+                {batchType === "central" && "Opening Stock (Starting Count)"}
                 {batchType === "bazar" && "Daily Bazar (Purchases)"}
                 {batchType === "sale" && "Daily Sale (Menu Deductions)"}
               </h3>
@@ -620,7 +620,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                 isSale
                   ? "Scan Menu Barcode (Daily Sale)"
                   : batchType === "central"
-                  ? "Scan Ingredient (Monthly Opening Stock)"
+                  ? "Scan Ingredient (Opening Stock)"
                   : "Scan Ingredient (Daily Bazar)"
               }
               subtitle="Align the barcode inside the frame — supports continuous scanning"
@@ -865,7 +865,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
           {showOwnerAuth && (
             <OwnerPasswordModal
               title="Authorize Approved Batch Edit"
-              description={`Enter the Owner password to save edits to approved ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} Batch #${activeBatch?.id}. Stock ledger entries will be reconciled automatically.`}
+              description={`Enter the Owner password to save edits to approved ${batchType === "central" ? "Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} Batch #${activeBatch?.id}. Stock ledger entries will be reconciled automatically.`}
               onClose={() => setShowOwnerAuth(false)}
               onConfirm={saveApprovedChanges}
             />
@@ -874,7 +874,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
           {showDeleteBatchAuth && activeBatch && (
             <OwnerPasswordModal
               title={`Delete Approved Batch #${activeBatch.id}`}
-              description={`This will permanently delete approved ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} Batch #${activeBatch.id} and recalculate stock balances. Owner password required.`}
+              description={`This will permanently delete approved ${batchType === "central" ? "Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} Batch #${activeBatch.id} and recalculate stock balances. Owner password required.`}
               onClose={() => setShowDeleteBatchAuth(false)}
               onConfirm={async (ownerPassword) => {
                 await api(`/batches/${activeBatch.id}/delete`, token, { owner_password: ownerPassword });
@@ -892,8 +892,8 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
 
           {showClearAuth && (
             <OwnerPasswordModal
-              title={`Clear All ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"}`}
-              description={`This will permanently delete all ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} batches and recalculate current stock balances. Only possible with the Owner password.`}
+              title={`Clear All ${batchType === "central" ? "Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"}`}
+              description={`This will permanently delete all ${batchType === "central" ? "Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} batches and recalculate current stock balances. Only possible with the Owner password.`}
               onClose={() => setShowClearAuth(false)}
               onConfirm={async (ownerPassword) => {
                 await api("/inventory/clear", token, { scope: batchType, owner_password: ownerPassword });
@@ -902,7 +902,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                 setLines([]);
                 setEditApprovedMode(false);
                 setMsg({
-                  text: `All ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} records cleared with Owner authorization.`,
+                  text: `All ${batchType === "central" ? "Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} records cleared with Owner authorization.`,
                   type: "info",
                 });
                 loadData();
@@ -1161,7 +1161,152 @@ function RecipesView({ token, api, userRole }) {
     return ["pcs"];
   };
 
+  const downloadRecipeBook = () => {
+    const esc = (s) =>
+      String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
+    const grouped = {};
+    for (const r of recipes) {
+      const cat = r.category || "General";
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(r);
+    }
+
+    const today = todayISO();
+    const sectionsHtml = Object.entries(grouped)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([cat, list]) => {
+        const cards = list
+          .map((r) => {
+            const activeRec = r.approved_recipe || r.draft_recipe;
+            const ings = activeRec?.ingredients || [];
+            const priceLabel = r.price && r.price > 0 ? `Tk ${(r.price / 100).toFixed(2)}` : "Price Not Set";
+            const statusLabel = r.approved_recipe
+              ? `Approved (v${r.approved_recipe.version})`
+              : r.draft_recipe
+              ? `Draft (v${r.draft_recipe.version})`
+              : "No Recipe";
+
+            const rows = ings.length
+              ? ings
+                  .map(
+                    (i) =>
+                      `<tr><td>${esc(i.bazar_item_name)}</td><td class="qty">${esc(
+                        formatQty(i.qty_base, i.base_unit)
+                      )}</td></tr>`
+                  )
+                  .join("")
+              : `<tr><td colspan="2" class="empty">No ingredients assigned yet</td></tr>`;
+
+            return `
+              <div class="recipe-card">
+                <div class="recipe-head">
+                  <div>
+                    <h3>${esc(r.name)}</h3>
+                    <div class="meta">Code: <code>${esc(r.barcode || "-")}</code> · ${esc(statusLabel)}</div>
+                  </div>
+                  <div class="price">${esc(priceLabel)}</div>
+                </div>
+                <table>
+                  <thead><tr><th>Ingredient</th><th class="qty">Quantity</th></tr></thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              </div>`;
+          })
+          .join("");
+
+        return `
+          <section class="category-section">
+            <h2>${esc(cat)} <span>(${list.length} items)</span></h2>
+            <div class="recipe-grid">${cards}</div>
+          </section>`;
+      })
+      .join("");
+
+    const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Crown Coffee Official Recipe Book (${today})</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; background: #f8fafc; margin: 0; padding: 24px; }
+  .book { max-width: 1080px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 32px; box-shadow: 0 10px 30px rgba(15,23,42,0.08); }
+  .cover { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #1C274C; padding-bottom: 16px; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .cover h1 { margin: 0; font-size: 26px; color: #1C274C; letter-spacing: -0.02em; }
+  .cover p { margin: 4px 0 0; color: #64748b; font-size: 13px; }
+  .print-btn { background: #1C274C; color: #fff; border: none; border-radius: 8px; padding: 10px 18px; font-weight: 700; cursor: pointer; font-size: 14px; }
+  .category-section { margin-bottom: 28px; }
+  .category-section h2 { margin: 0 0 12px; font-size: 17px; color: #fff; background: #1C274C; padding: 8px 14px; border-radius: 8px; break-after: avoid; page-break-after: avoid; }
+  .category-section h2 span { font-weight: 500; opacity: 0.8; font-size: 13px; }
+  .recipe-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .recipe-card { border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 14px; background: #fff; break-inside: avoid; page-break-inside: avoid; }
+  .recipe-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+  .recipe-head h3 { margin: 0; font-size: 15px; color: #0f172a; }
+  .meta { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .price { font-size: 13px; font-weight: 800; color: #4338ca; background: #eef2ff; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { padding: 5px 6px; border-bottom: 1px solid #f1f5f9; text-align: left; }
+  th { font-size: 11px; text-transform: uppercase; color: #64748b; background: #f8fafc; }
+  .qty { text-align: right; font-weight: 700; color: #0369a1; white-space: nowrap; }
+  .empty { color: #94a3b8; font-style: italic; text-align: center; }
+  @media (max-width: 720px) { .recipe-grid { grid-template-columns: 1fr; } body { padding: 10px; } .book { padding: 16px; } }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .book { box-shadow: none; padding: 0; max-width: 100%; }
+    .no-print { display: none !important; }
+    .recipe-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .recipe-card { width: calc(50% - 5px); }
+    .category-section h2 { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+  <div class="book">
+    <div class="cover">
+      <div>
+        <h1>Crown Coffee — Official Recipe Book</h1>
+        <p>Total Recipes: ${recipes.length} · Generated: ${today}</p>
+      </div>
+      <button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+    ${sectionsHtml}
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Crown_Coffee_Recipe_Book_${today}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setMsg(`Downloaded Crown Coffee Recipe Book (${recipes.length} items)! Open the file to view or Save as PDF.`);
+  };
+
   return (
+    <div>
+      <div className="row" style={{ marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.6rem" }}>
+        <span style={{ fontSize: "0.86rem", color: "var(--ink-muted)" }}>
+          All standardized kitchen & bar recipes ({recipes.length} items)
+        </span>
+        <button
+          className="secondary"
+          onClick={downloadRecipeBook}
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", minHeight: "38px" }}
+        >
+          <IconDownload size={15} />
+          <span>Download Recipe Book</span>
+        </button>
+      </div>
     <div className="split-left">
       <div className="card">
         <div className="row" style={{ marginBottom: "0.75rem" }}>
@@ -1508,6 +1653,7 @@ function RecipesView({ token, api, userRole }) {
           onConfirm={(pwd) => (recipeAuthAction === "approve" ? executeApproveRecipe(pwd) : executeSaveDraft(pwd))}
         />
       )}
+    </div>
     </div>
   );
 }
@@ -1909,15 +2055,15 @@ function InventoryOverviewView({ token, api, userRole }) {
             clearScope === "all"
               ? "Reset All Inventory & Stocks to Zero"
               : clearScope === "central"
-              ? "Clear Monthly Opening Stock"
+              ? "Clear Opening Stock"
               : clearScope === "bazar"
               ? "Clear All Daily Bazar"
               : "Clear All Daily Sale"
           }
           description={
             clearScope === "all"
-              ? "This will permanently clear all Monthly Opening Stock, Daily Bazar, Daily Sale batches, and stock ledger entries, setting all stocks to 0 (menu & ingredient catalog remain intact). Owner password required."
-              : `This will permanently delete all ${clearScope === "central" ? "Monthly Opening Stock" : clearScope === "bazar" ? "Daily Bazar" : "Daily Sale"} records and recalculate stock balances. Owner password required.`
+              ? "This will permanently clear all Opening Stock, Daily Bazar, Daily Sale batches, and stock ledger entries, setting all stocks to 0 (menu & ingredient catalog remain intact). Owner password required."
+              : `This will permanently delete all ${clearScope === "central" ? "Opening Stock" : clearScope === "bazar" ? "Daily Bazar" : "Daily Sale"} records and recalculate stock balances. Owner password required.`
           }
           onClose={() => setClearScope(null)}
           onConfirm={async (ownerPassword) => {
@@ -1926,7 +2072,7 @@ function InventoryOverviewView({ token, api, userRole }) {
               clearScope === "all"
                 ? "All inventory & stocks reset to zero"
                 : clearScope === "central"
-                ? "Monthly Opening Stock cleared"
+                ? "Opening Stock cleared"
                 : clearScope === "bazar"
                 ? "Daily Bazar cleared"
                 : "Daily Sale cleared";
@@ -2111,10 +2257,10 @@ function InventoryOverviewView({ token, api, userRole }) {
           <thead>
             <tr>
               <th>Bazar Item</th>
-              <th>Monthly Opening Stock</th>
+              <th>Opening Stock</th>
               <th>Bazar</th>
               <th>Sale</th>
-              <th>Current Stock</th>
+              <th style={{ background: "#e0f2fe", color: "#0369a1" }}>Current Stock</th>
               <th>Min Stock</th>
               <th>Status</th>
               <th>Actions</th>
@@ -2127,7 +2273,22 @@ function InventoryOverviewView({ token, api, userRole }) {
                 <td>{formatQty(i.central_total, i.base_unit)}</td>
                 <td>{formatQty(i.bazar_total, i.base_unit)}</td>
                 <td>{formatQty(i.sale_total, i.base_unit)}</td>
-                <td><b>{formatQty(i.current_stock, i.base_unit)}</b></td>
+                <td style={{ background: i.status === "LOW" ? "#ffe4e6" : "#f0f9ff" }}>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "3px 10px",
+                      borderRadius: "999px",
+                      fontWeight: 800,
+                      fontSize: "0.88rem",
+                      background: i.status === "LOW" ? "#fecdd3" : "#bae6fd",
+                      color: i.status === "LOW" ? "#9f1239" : "#0369a1",
+                      border: i.status === "LOW" ? "1px solid #fda4af" : "1px solid #7dd3fc",
+                    }}
+                  >
+                    {formatQty(i.current_stock, i.base_unit)}
+                  </span>
+                </td>
                 <td>{formatQty(i.min_stock, i.base_unit)}</td>
                 <td>
                   <span style={{ fontWeight: 700, color: i.status === "LOW" ? "var(--red)" : "var(--green)" }}>
@@ -2235,7 +2396,7 @@ function InventoryOverviewView({ token, api, userRole }) {
             </select>
             <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
               <option value="">All Types</option>
-              <option value="central">Monthly Opening Stock</option>
+              <option value="central">Opening Stock</option>
               <option value="bazar">Bazar</option>
               <option value="sale">Sale</option>
               <option value="reversal">Reversal</option>
@@ -2312,7 +2473,7 @@ export function InventorySuite({ token, api, userRole, onBack }) {
       </div>
 
       <div className="nav-tabs">
-        <button className={tab === "central" ? "active" : ""} onClick={() => setTab("central")}>Monthly Opening Stock</button>
+        <button className={tab === "central" ? "active" : ""} onClick={() => setTab("central")}>Opening Stock</button>
         <button className={tab === "bazar" ? "active" : ""} onClick={() => setTab("bazar")}>Daily Bazar</button>
         <button className={tab === "sale" ? "active" : ""} onClick={() => setTab("sale")}>Daily Sale</button>
         <button className={tab === "recipes" ? "active" : ""} onClick={() => setTab("recipes")}>Recipes</button>
