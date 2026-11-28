@@ -87,6 +87,7 @@ class WastageIn(BaseModel):
     ingredient_id: int
     qty_lost: int
     reason: str
+    date: Optional[str] = None
 
 class VoidRefundIn(BaseModel):
     order_id: int
@@ -175,6 +176,7 @@ class BatchLineIn(BaseModel):
     menu_item_id: Optional[int] = None
     quantity: int  # base units for central/bazar, servings for sale
     pack_count: float = 1.0
+    total_cost: int = 0  # integer paisa paid for this line
 
 
 class BatchLinesUpdateIn(BaseModel):

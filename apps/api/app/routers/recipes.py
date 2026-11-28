@@ -4,7 +4,7 @@ from app.database import now
 from app.dependencies import get_db, auth, apply_postgres_rls, verify_owner_password
 from app.models import Item, Ingredient, Recipe, RecipeItem, User
 from app.schemas import RecipeDraftIn, RecipeApproveIn
-from app.services.inventory_service import convert_to_base_units, get_approved_recipe
+from app.services.inventory_service import convert_to_base_units, get_approved_recipe, compute_recipe_cost
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
 
@@ -22,6 +22,8 @@ def _serialize_recipe_lines(db, tenant_id: int, recipe: Recipe):
             "qty_base": r.qty,
             "input_amount": r.input_amount if r.input_amount is not None else r.qty,
             "input_unit": r.input_unit or (ing.unit if ing else ""),
+            "cost_per_unit": int(ing.cost_per_unit or 0) if ing else 0,
+            "line_cost": int(r.qty or 0) * int(ing.cost_per_unit or 0) if ing else 0,
         })
     return out
 
@@ -29,6 +31,8 @@ def _serialize_recipe_lines(db, tenant_id: int, recipe: Recipe):
 def _serialize_recipe(db, tenant_id: int, recipe: Recipe):
     creator = db.get(User, recipe.created_by) if recipe.created_by else None
     approver = db.get(User, recipe.approved_by) if recipe.approved_by else None
+    lines = _serialize_recipe_lines(db, tenant_id, recipe)
+    total_cost = sum(x["line_cost"] for x in lines)
     return {
         "id": recipe.id,
         "item_id": recipe.item_id,
@@ -38,7 +42,8 @@ def _serialize_recipe(db, tenant_id: int, recipe: Recipe):
         "created_at": recipe.created_at.isoformat() if recipe.created_at else None,
         "approved_by": approver.name if approver else None,
         "approved_at": recipe.approved_at.isoformat() if recipe.approved_at else None,
-        "ingredients": _serialize_recipe_lines(db, tenant_id, recipe),
+        "total_cost": total_cost,
+        "ingredients": lines,
     }
 
 
@@ -55,6 +60,9 @@ def list_recipes(u=Depends(auth), db=Depends(get_db)):
             .order_by(Recipe.version.desc())
             .first()
         )
+        active_rec = approved or draft
+        recipe_cost = compute_recipe_cost(db, u["tid"], active_rec.id) if active_rec else 0
+        margin_pct = round(((it.price - recipe_cost) * 100.0) / it.price, 1) if (it.price is not None and it.price > 0) else None
         res.append({
             "item_id": it.id,
             "name": it.name,
@@ -62,6 +70,8 @@ def list_recipes(u=Depends(auth), db=Depends(get_db)):
             "price": it.price,
             "category": it.category or "General",
             "recipe_status": "approved" if approved else ("draft" if draft else "none"),
+            "recipe_cost": recipe_cost,
+            "margin_pct": margin_pct,
             "approved_recipe": _serialize_recipe(db, u["tid"], approved) if approved else None,
             "draft_recipe": _serialize_recipe(db, u["tid"], draft) if draft else None,
         })

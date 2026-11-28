@@ -173,6 +173,7 @@ class InventoryBatchLine(Base):
     recipe_version = Column(Integer, nullable=True)
     quantity = Column(Integer)  # base units for central/bazar, servings for sale
     pack_count = Column(Float, default=1.0)
+    total_cost = Column(Integer, default=0)  # integer paisa paid for this line (Daily Bazar)
 
 class StockLedger(Base):
     __tablename__ = "stock_ledger"

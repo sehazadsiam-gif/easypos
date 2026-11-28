@@ -191,29 +191,49 @@ def list_movements(u=Depends(auth), db=Depends(get_db)):
 
 @router.post("/wastage")
 def record_wastage(b: WastageIn, u=Depends(auth), db=Depends(get_db)):
+    """Record wastage, spoilage, bar dial-in, or staff consumption directly into append-only StockLedger."""
     apply_postgres_rls(db, u["tid"])
     ing = db.get(Ingredient, b.ingredient_id)
     if not ing or ing.tenant_id != u["tid"]:
         raise HTTPException(404, "Ingredient not found")
     if b.qty_lost <= 0:
         raise HTTPException(400, "Quantity must be greater than zero")
+    if not b.reason or not b.reason.strip():
+        raise HTTPException(400, "Reason is required for wastage/staff log")
 
-    actual_lost = min(ing.current_stock, b.qty_lost)
-    ing.current_stock -= actual_lost
-    cost = actual_lost * ing.cost_per_unit
+    qty = int(b.qty_lost)
+    cost = qty * int(ing.cost_per_unit or 0)
+    entry_date = (b.date or "").strip() or today_str()
+
+    ledger_entry = StockLedger(
+        tenant_id=u["tid"],
+        bazar_item_id=ing.id,
+        quantity=-qty,
+        type="wastage",
+        date=entry_date,
+        reason=b.reason.strip(),
+        created_by=u["uid"],
+    )
+    db.add(ledger_entry)
+    ing.current_stock = (ing.current_stock or 0) - qty
 
     db.add(StockMovement(
         tenant_id=u["tid"],
         ingredient_id=ing.id,
         movement_type="wastage",
-        qty_change=-actual_lost,
-        unit=ing.unit,
+        qty_change=-qty,
+        unit=ing.unit or "g",
         cost_paisa=cost,
-        reason=b.reason,
+        reason=b.reason.strip(),
         created_by=u["uid"]
     ))
     db.commit()
-    return {"status": "ok", "remaining_stock": ing.current_stock, "cost_lost": cost}
+    return {
+        "status": "ok",
+        "ledger_id": ledger_entry.id,
+        "remaining_stock": ing.current_stock,
+        "cost_lost": cost,
+    }
 
 @router.get("/recipes/{item_id}")
 def get_recipe(item_id: int, u=Depends(auth), db=Depends(get_db)):

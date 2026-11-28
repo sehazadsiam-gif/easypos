@@ -20,6 +20,17 @@ router = APIRouter(prefix="/batches", tags=["batches"])
 VALID_BATCH_TYPES = {"central", "bazar", "sale"}
 
 
+def _apply_weighted_avg_cost(ing: Ingredient, prev_stock: int, added_qty: int, total_cost_paisa: int):
+    """Update ingredient cost_per_unit (integer paisa per base unit) via weighted average."""
+    if not ing or not total_cost_paisa or total_cost_paisa <= 0 or added_qty <= 0:
+        return
+    base_stock = max(0, int(prev_stock or 0))
+    prev_val = base_stock * int(ing.cost_per_unit or 0)
+    new_qty = base_stock + int(added_qty)
+    if new_qty > 0:
+        ing.cost_per_unit = round((prev_val + int(total_cost_paisa)) / new_qty)
+
+
 def _serialize_batch(db, tenant_id: int, batch: InventoryBatch, include_lines: bool = False):
     creator = db.get(User, batch.created_by) if batch.created_by else None
     approver = db.get(User, batch.approved_by) if batch.approved_by else None
@@ -33,6 +44,7 @@ def _serialize_batch(db, tenant_id: int, batch: InventoryBatch, include_lines: b
         "note": batch.note,
         "allow_negative_stock": batch.allow_negative_stock,
         "line_count": len(lines),
+        "batch_total_cost": sum(int(getattr(l, "total_cost", 0) or 0) for l in lines),
         "created_by": creator.name if creator else "Staff",
         "created_at": batch.created_at.isoformat() if batch.created_at else None,
         "approved_by": approver.name if approver else None,
@@ -56,6 +68,8 @@ def _serialize_batch(db, tenant_id: int, batch: InventoryBatch, include_lines: b
                     "pack_size": int(ing.pack_size or 1) if ing else 1,
                     "quantity": ln.quantity,
                     "pack_count": ln.pack_count,
+                    "total_cost": int(getattr(ln, "total_cost", 0) or 0),
+                    "cost_per_unit": int(ing.cost_per_unit or 0) if ing else 0,
                 })
             else:
                 it = db.get(Item, ln.menu_item_id)
@@ -139,6 +153,16 @@ def create_batch(b: BatchCreateIn, u=Depends(auth), db=Depends(get_db)):
         raise HTTPException(400, "Invalid batch_type. Must be central, bazar, or sale")
     apply_postgres_rls(db, u["tid"])
 
+    if b.batch_type == "central":
+        existing_approved = db.query(InventoryBatch).filter_by(
+            tenant_id=u["tid"], batch_type="central", status="approved"
+        ).first()
+        if existing_approved:
+            raise HTTPException(
+                400,
+                "Opening Stock is one-time only and is already approved. Edit it with Owner Password or use Daily Bazar for new stock.",
+            )
+
     batch = InventoryBatch(
         tenant_id=u["tid"],
         batch_type=b.batch_type,
@@ -190,6 +214,7 @@ def update_batch_lines(batch_id: int, b: BatchLinesUpdateIn, u=Depends(auth), db
                 bazar_item_id=ing.id,
                 quantity=ln.quantity,
                 pack_count=ln.pack_count,
+                total_cost=max(0, int(ln.total_cost or 0)),
             ))
         else:
             if not ln.menu_item_id:
@@ -240,8 +265,12 @@ def update_batch_lines(batch_id: int, b: BatchLinesUpdateIn, u=Depends(auth), db
 
         # Re-post ledger entries for the edited lines
         if batch.batch_type in ("central", "bazar"):
+            stock_map_now = get_current_stock_map(db, u["tid"])
             for nl in new_lines:
                 ing = db.get(Ingredient, nl.bazar_item_id)
+                prev_stk = stock_map_now.get(nl.bazar_item_id, 0)
+                if ing and (nl.total_cost or 0) > 0:
+                    _apply_weighted_avg_cost(ing, prev_stk, nl.quantity, nl.total_cost)
                 db.add(StockLedger(
                     tenant_id=u["tid"],
                     bazar_item_id=nl.bazar_item_id,
@@ -252,6 +281,7 @@ def update_batch_lines(batch_id: int, b: BatchLinesUpdateIn, u=Depends(auth), db
                     reason=f"Owner Edited {batch.batch_type.title()} Batch #{batch.id}",
                     created_by=verified_owner.id,
                 ))
+                stock_map_now[nl.bazar_item_id] = prev_stk + nl.quantity
                 if ing:
                     ing.current_stock = (ing.current_stock or 0) + nl.quantity
         else:
@@ -311,15 +341,30 @@ def approve_batch(batch_id: int, b: BatchApproveIn, u=Depends(auth), db=Depends(
     if batch.status != "draft":
         raise HTTPException(400, "Batch is already approved and locked")
 
+    if batch.batch_type == "central":
+        existing_approved = db.query(InventoryBatch).filter_by(
+            tenant_id=u["tid"], batch_type="central", status="approved"
+        ).first()
+        if existing_approved:
+            raise HTTPException(
+                400,
+                "Opening Stock is one-time only and is already approved. Edit it with Owner Password or use Daily Bazar for new stock.",
+            )
+
     lines = db.query(InventoryBatchLine).filter_by(tenant_id=u["tid"], batch_id=batch.id).all()
     if not lines:
         raise HTTPException(400, "Cannot approve an empty batch")
 
     if batch.batch_type in ("central", "bazar"):
+        stock_map_before = get_current_stock_map(db, u["tid"])
         for ln in lines:
             ing = db.get(Ingredient, ln.bazar_item_id)
             if not ing or ing.tenant_id != u["tid"]:
                 raise HTTPException(400, "Invalid bazar item in batch")
+            prev_stk = stock_map_before.get(ing.id, 0)
+            line_cost = int(getattr(ln, "total_cost", 0) or 0)
+            if line_cost > 0:
+                _apply_weighted_avg_cost(ing, prev_stk, ln.quantity, line_cost)
             db.add(StockLedger(
                 tenant_id=u["tid"],
                 bazar_item_id=ing.id,
@@ -327,9 +372,10 @@ def approve_batch(batch_id: int, b: BatchApproveIn, u=Depends(auth), db=Depends(
                 type=batch.batch_type,
                 batch_id=batch.id,
                 date=batch.batch_date,
-                reason=f"{batch.batch_type.title()} Batch #{batch.id}",
+                reason=f"{batch.batch_type.title()} Batch #{batch.id}" + (f" (৳{line_cost/100:.2f})" if line_cost > 0 else ""),
                 created_by=u["uid"],
             ))
+            stock_map_before[ing.id] = prev_stk + ln.quantity
             # Keep legacy current_stock column in sync
             ing.current_stock = (ing.current_stock or 0) + ln.quantity
     else:

@@ -16,6 +16,7 @@ def get_headers(role="owner"):
 def test_central_and_bazar_approve_adds_stock_and_locks_batch():
     owner_h = get_headers("owner")
     staff_h = get_headers("cashier")
+    client.post("/inventory/clear", json={"scope": "central", "owner_password": "258000"}, headers=owner_h)
 
     # Create a new bazar item with unique barcode
     bc = f"ING-TEST-{uuid.uuid4().hex[:6].upper()}"
@@ -201,6 +202,7 @@ def test_unit_conversion_and_recipe_approval_workflow():
 
 def test_sale_deduction_negative_stock_and_reversal():
     owner_h = get_headers("owner")
+    client.post("/inventory/clear", json={"scope": "central", "owner_password": "258000"}, headers=owner_h)
 
     # Setup item & ingredients
     bc_g = f"ING-S-{uuid.uuid4().hex[:5].upper()}"
@@ -271,6 +273,7 @@ def test_qty_prefix_rejected_on_barcodes():
 def test_clear_inventory_requires_owner_password():
     owner_h = get_headers("owner")
     mgr_h = get_headers("manager")
+    client.post("/inventory/clear", json={"scope": "central", "owner_password": "258000"}, headers=owner_h)
 
     bc = f"ING-CLR-{uuid.uuid4().hex[:5].upper()}"
     ing_id = client.post("/inventory", json={
@@ -379,3 +382,52 @@ def test_pos_order_deducts_stock_ledger_in_inventory():
     assert item["bazar_total"] == 100
     assert item["sale_total"] == 30
     assert item["current_stock"] == 70
+
+
+def test_wastage_bazar_weighted_cost_margin_and_onetime_opening_stock():
+    owner_h = get_headers("owner")
+    client.post("/inventory/clear", json={"scope": "central", "owner_password": "258000"}, headers=owner_h)
+
+    bc_i = f"ING-WCM-{uuid.uuid4().hex[:5].upper()}"
+    ing_id = client.post("/inventory", json={
+        "name": "WCM Coffee Bean", "unit": "g", "barcode": bc_i, "pack_size": 100, "min_stock": 200
+    }, headers=owner_h).json()["id"]
+
+    bc_m = f"MENU-WCM-{uuid.uuid4().hex[:5].upper()}"
+    menu_id = client.post("/items", json={
+        "name": "WCM Latte", "barcode": bc_m, "price": 20000, "station": "bar"
+    }, headers=owner_h).json()["id"]
+
+    client.post(f"/recipes/{menu_id}/draft", json={"ingredients": [{"bazar_item_id": ing_id, "amount": 10, "unit": "g"}]}, headers=owner_h)
+    client.post(f"/recipes/{menu_id}/approve", headers=owner_h)
+
+    # 1. One-time Opening Stock: first batch succeeds, second batch is blocked
+    cb1 = client.post("/batches", json={"batch_type": "central"}, headers=owner_h).json()["id"]
+    client.put(f"/batches/{cb1}/lines", json={"lines": [{"bazar_item_id": ing_id, "quantity": 100, "pack_count": 1, "total_cost": 10000}]}, headers=owner_h)
+    assert client.post(f"/batches/{cb1}/approve", json={}, headers=owner_h).status_code == 200
+    # Second opening stock batch rejected because opening stock is one-time only
+    r_cb2 = client.post("/batches", json={"batch_type": "central"}, headers=owner_h)
+    assert r_cb2.status_code == 400
+    assert "one-time" in r_cb2.json()["detail"].lower()
+
+    # 2. Daily Bazar with Price Paid: 100g @ 100 paisa/g + 100g @ 300 paisa/g -> Weighted Avg = 200 paisa/g
+    bb = client.post("/batches", json={"batch_type": "bazar"}, headers=owner_h).json()["id"]
+    client.put(f"/batches/{bb}/lines", json={"lines": [{"bazar_item_id": ing_id, "quantity": 100, "pack_count": 1, "total_cost": 30000}]}, headers=owner_h)
+    assert client.post(f"/batches/{bb}/approve", json={}, headers=owner_h).status_code == 200
+
+    # Check live recipe COGS (10g * 200 paisa = 2000 paisa = ৳20) and Margin ((20000-2000)/20000 = 90.0%)
+    items = client.get("/items", headers=owner_h).json()
+    m_item = next(x for x in items if x["id"] == menu_id)
+    assert m_item["recipe_cost"] == 2000
+    assert m_item["gross_profit"] == 18000
+    assert m_item["margin_pct"] == 90.0
+
+    # 3. Wastage / Dial-In directly deducts in StockLedger and shows in wastage_total
+    r_waste = client.post("/inventory/wastage", json={
+        "ingredient_id": ing_id, "qty_lost": 25, "reason": "Espresso dial-in"
+    }, headers=owner_h)
+    assert r_waste.status_code == 200
+    inv = client.get("/inventory", headers=owner_h).json()
+    ing_row = next(x for x in inv if x["id"] == ing_id)
+    assert ing_row["wastage_total"] == 25
+    assert ing_row["current_stock"] == 175  # 100 opening + 100 bazar - 25 wastage

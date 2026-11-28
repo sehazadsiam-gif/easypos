@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.dependencies import get_db, auth, apply_postgres_rls, verify_owner_password
 from app.models import Item, Recipe, RecipeItem, InventoryBatchLine
 from app.schemas import ItemIn, ItemUpdateIn, OwnerActionIn
-from app.services.inventory_service import validate_barcode, get_approved_recipe
+from app.services.inventory_service import validate_barcode, get_approved_recipe, compute_recipe_cost
 
 router = APIRouter(prefix="/items", tags=["items"])
 
@@ -31,12 +31,18 @@ def list_items(
         if approved_rec:
             recipe_status = "approved"
             recipe_count = db.query(RecipeItem).filter_by(tenant_id=u["tid"], recipe_id=approved_rec.id).count()
+            recipe_cost = compute_recipe_cost(db, u["tid"], approved_rec.id)
         elif draft_rec:
             recipe_status = "draft"
             recipe_count = db.query(RecipeItem).filter_by(tenant_id=u["tid"], recipe_id=draft_rec.id).count()
+            recipe_cost = compute_recipe_cost(db, u["tid"], draft_rec.id)
         else:
             recipe_status = "none"
             recipe_count = db.query(RecipeItem).filter_by(tenant_id=u["tid"], item_id=i.id).count()
+            recipe_cost = 0
+
+        gross_profit = (i.price - recipe_cost) if (i.price is not None and i.price > 0) else None
+        margin_pct = round(((i.price - recipe_cost) * 100.0) / i.price, 1) if (i.price is not None and i.price > 0) else None
 
         res.append({
             "id": i.id,
@@ -51,6 +57,9 @@ def list_items(
             "approved_recipe_version": approved_rec.version if approved_rec else None,
             "has_draft_recipe": draft_rec is not None,
             "draft_recipe_version": draft_rec.version if draft_rec else None,
+            "recipe_cost": recipe_cost,
+            "gross_profit": gross_profit,
+            "margin_pct": margin_pct,
         })
     return res
 

@@ -36,6 +36,7 @@ def _ensure_columns():
         ("stock_movements", "created_by", "INTEGER"),
         ("print_jobs", "station", "VARCHAR DEFAULT 'kitchen'"),
         ("print_jobs", "status", "VARCHAR DEFAULT 'pending'"),
+        ("inventory_batch_lines", "total_cost", "INTEGER DEFAULT 0"),
     ]
     is_sqlite = str(engine.url).startswith("sqlite")
     for table, col, col_type in migrations:

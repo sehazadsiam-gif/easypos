@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { PrintableBarcodeSheet, BarcodeSvg } from "./BarcodeSheet";
+import { PrintableBarcodeSheet, BarcodeSvg, classifyIngredient } from "./BarcodeSheet";
 import { CameraScannerModal } from "./CameraScanner";
 import { IconAlert, IconClose, IconCheck, IconEdit, IconPlus, IconPrinter, IconSearch, IconArrowLeft, IconLock, IconCamera, IconDownload } from "./Icons";
 
@@ -207,7 +207,12 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
       lines: nextLines.map((l) =>
         isSale
           ? { menu_item_id: l.menu_item_id, quantity: l.quantity }
-          : { bazar_item_id: l.bazar_item_id, quantity: l.quantity, pack_count: l.pack_count || 1 }
+          : {
+              bazar_item_id: l.bazar_item_id,
+              quantity: l.quantity,
+              pack_count: l.pack_count || 1,
+              total_cost: Math.max(0, Math.round(l.total_cost || 0)),
+            }
       ),
       ...(ownerPassword ? { owner_password: ownerPassword } : {}),
     };
@@ -436,6 +441,23 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
     }
   };
 
+  const setLineCost = async (idx, takaStr) => {
+    if (activeBatch?.status === "approved" && !editApprovedMode) return;
+    const parsed = takaStr === "" ? 0 : parseFloat(takaStr);
+    if (isNaN(parsed) || parsed < 0) return;
+    const costPaisa = Math.round(parsed * 100);
+    const next = [...lines];
+    next[idx] = { ...next[idx], total_cost: costPaisa };
+    setLines(next);
+    if (!editApprovedMode && activeBatch && activeBatch.status === "draft") {
+      try {
+        await syncLinesToServer(activeBatch, next);
+      } catch (e) {
+        setMsg({ text: e.message, type: "error" });
+      }
+    }
+  };
+
   const removeLine = async (idx) => {
     if (activeBatch?.status === "approved" && !editApprovedMode) return;
     const next = lines.filter((_, i) => i !== idx);
@@ -512,6 +534,14 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
   const isApproved = activeBatch?.status === "approved";
   const isLocked = isApproved && !editApprovedMode;
   const warnings = activeBatch?.stock_warnings || [];
+  const approvedOpeningBatch = batchType === "central" ? batches.find((b) => b.status === "approved") : null;
+  const totalBatchSpend = lines.reduce((acc, l) => acc + (l.total_cost || 0), 0);
+
+  useEffect(() => {
+    if (batchType === "central" && approvedOpeningBatch && !activeBatch) {
+      openBatch(approvedOpeningBatch.id);
+    }
+  }, [batchType, approvedOpeningBatch?.id]);
 
   return (
     <div className="split-right">
@@ -542,7 +572,9 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                   }}
                 />
               )}
-              <button className="secondary" onClick={startNewDraft}>+ New Draft</button>
+              {!(batchType === "central" && approvedOpeningBatch) && (
+                <button className="secondary" onClick={startNewDraft}>+ New Draft</button>
+              )}
               {activeBatch && (
                 <button
                   className="warn"
@@ -583,6 +615,12 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
               </button>
             </div>
           </div>
+
+          {batchType === "central" && approvedOpeningBatch && (
+            <div style={{ marginBottom: "0.75rem", padding: "0.65rem 0.9rem", borderRadius: "8px", background: "var(--emerald-light)", border: "1px solid var(--emerald-border)", color: "#065f46", fontSize: "0.84rem", fontWeight: 600 }}>
+              Opening Stock is a one-time initial count and is already approved (Batch #{approvedOpeningBatch.id}). Use <b>Daily Bazar</b> for new market purchases and <b>Daily Sale</b> for sales — or edit this batch below with Owner Password.
+            </div>
+          )}
 
           <div className="scanner-container" style={{ margin: "0.8rem 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
@@ -713,7 +751,14 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
         </div>
 
         <div className="card">
-          <h4 style={{ marginTop: 0 }}>Scanned Lines ({lines.length})</h4>
+          <div className="row" style={{ marginBottom: "0.6rem", flexWrap: "wrap" }}>
+            <h4 style={{ margin: 0 }}>Scanned Lines ({lines.length})</h4>
+            {!isSale && totalBatchSpend > 0 && (
+              <span style={{ background: "var(--emerald-light)", color: "#065f46", border: "1px solid var(--emerald-border)", padding: "3px 10px", borderRadius: "999px", fontWeight: 800, fontSize: "0.85rem" }}>
+                Total Spend: ৳{(totalBatchSpend / 100).toFixed(2)}
+              </span>
+            )}
+          </div>
           {lines.length === 0 ? (
             <p style={{ color: "var(--gray)" }}>Scan a barcode above or type a code and press Enter.</p>
           ) : (
@@ -723,6 +768,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                 <tr>
                   <th>Item</th>
                   <th>{isSale ? "Servings" : "Quantity (Base Units)"}</th>
+                  {!isSale && <th>Price Paid (৳)</th>}
                   {isSale && <th>Ingredients Used</th>}
                   <th>Actions</th>
                 </tr>
@@ -765,6 +811,27 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                         )}
                       </div>
                     </td>
+                    {!isSale && (
+                      <td>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            disabled={isLocked}
+                            placeholder="0"
+                            style={{ width: "105px", padding: "0.45rem 0.55rem", fontWeight: 700 }}
+                            value={l.total_cost ? (l.total_cost / 100).toString() : ""}
+                            onChange={(e) => setLineCost(idx, e.target.value)}
+                          />
+                          {l.total_cost > 0 && l.quantity > 0 && (
+                            <small style={{ color: "#0369a1", fontWeight: 600, fontSize: "0.72rem" }}>
+                              ৳{((l.total_cost / 100) / l.quantity * (l.base_unit === "pcs" ? 1 : 100)).toFixed(2)} / {l.base_unit === "pcs" ? "pc" : `100${l.base_unit}`}
+                            </small>
+                          )}
+                        </div>
+                      </td>
+                    )}
                     {isSale && (
                       <td>
                         {(l.ingredients_used || []).map((iu) => (
@@ -1206,6 +1273,8 @@ function RecipesView({ token, api, userRole }) {
             const activeRec = r.approved_recipe || r.draft_recipe;
             const ings = activeRec?.ingredients || [];
             const priceLabel = r.price && r.price > 0 ? `Tk ${(r.price / 100).toFixed(2)}` : "Price Not Set";
+            const costLabel = r.recipe_cost > 0 ? `COGS: Tk ${(r.recipe_cost / 100).toFixed(2)}` : "";
+            const marginLabel = r.margin_pct != null ? ` · Margin: ${r.margin_pct}%` : "";
             const statusLabel = r.approved_recipe
               ? `Approved (v${r.approved_recipe.version})`
               : r.draft_recipe
@@ -1228,7 +1297,7 @@ function RecipesView({ token, api, userRole }) {
                 <div class="recipe-head">
                   <div>
                     <h3>${esc(r.name)}</h3>
-                    <div class="meta">Code: <code>${esc(r.barcode || "-")}</code> · ${esc(statusLabel)}</div>
+                    <div class="meta">Code: <code>${esc(r.barcode || "-")}</code> · ${esc(statusLabel)}${costLabel ? ` · ${esc(costLabel)}${esc(marginLabel)}` : ""}</div>
                   </div>
                   <div class="price">${esc(priceLabel)}</div>
                 </div>
@@ -1848,9 +1917,29 @@ function MenuApprovedView({ token, api, userRole }) {
                   </span>
                 </div>
 
-                <div style={{ fontSize: "0.78rem", color: "var(--gray)", marginBottom: "0.5rem" }}>
+                <div style={{ fontSize: "0.78rem", color: "var(--gray)", marginBottom: "0.4rem" }}>
                   Category: <b>{m.category || "General"}</b> · Station: <b>{m.station || "kitchen"}</b>
                 </div>
+
+                {(m.recipe_cost > 0 || m.margin_pct != null) && (
+                  <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.45rem", fontSize: "0.74rem", fontWeight: 700 }}>
+                    <span style={{ background: "#f1f5f9", color: "#334155", padding: "2px 7px", borderRadius: "6px" }}>
+                      COGS: ৳{((m.recipe_cost || 0) / 100).toFixed(2)}
+                    </span>
+                    {m.margin_pct != null && (
+                      <span
+                        style={{
+                          padding: "2px 7px",
+                          borderRadius: "6px",
+                          background: m.margin_pct >= 65 ? "var(--emerald-light)" : m.margin_pct >= 45 ? "#fef3c7" : "var(--rose-light)",
+                          color: m.margin_pct >= 65 ? "#065f46" : m.margin_pct >= 45 ? "#92400e" : "var(--rose)",
+                        }}
+                      >
+                        Margin: {m.margin_pct}%
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {m.barcode && (
                   <div style={{ margin: "0.4rem 0", background: "#fff", padding: "6px", borderRadius: "6px", border: "1px solid #f1f5f9", textAlign: "center" }}>
@@ -2055,6 +2144,83 @@ function InventoryOverviewView({ token, api, userRole }) {
   };
 
   const lowItems = summary.filter((i) => i.status === "LOW");
+  const [copiedWa, setCopiedWa] = useState(false);
+
+  const groupedLowItems = lowItems.reduce((acc, item) => {
+    const dept = classifyIngredient(item.name);
+    if (!acc[dept]) acc[dept] = [];
+    acc[dept].push(item);
+    return acc;
+  }, {});
+
+  const copyWhatsAppShoppingList = async () => {
+    const linesOut = [
+      `*CROWN COFFEE — DAILY BAZAR LIST (${todayISO()})*`,
+      `Low Stock Items: ${lowItems.length}`,
+      "",
+    ];
+    Object.entries(groupedLowItems)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([dept, list]) => {
+        linesOut.push(`*${dept.toUpperCase()}*`);
+        list.forEach((item) => {
+          linesOut.push(`- ${formatBazarName(item.name, item.base_unit || item.unit)}: Buy ${formatQty(item.suggested_buy, item.base_unit)} (Stock: ${formatQty(item.current_stock, item.base_unit)})`);
+        });
+        linesOut.push("");
+      });
+    const text = linesOut.join("\n").trim();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedWa(true);
+      setTimeout(() => setCopiedWa(false), 2500);
+    } catch {
+      window.prompt("Copy WhatsApp Shopping List:", text);
+    }
+  };
+
+  const printShoppingList = () => {
+    const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const sections = Object.entries(groupedLowItems)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(
+        ([dept, list]) => `
+        <h3>${esc(dept)} (${list.length})</h3>
+        <table>
+          <thead><tr><th>Ingredient</th><th>Current</th><th>Min</th><th>Suggested Buy</th><th>Done</th></tr></thead>
+          <tbody>
+            ${list
+              .map(
+                (i) => `<tr>
+                  <td><b>${esc(formatBazarName(i.name, i.base_unit || i.unit))}</b></td>
+                  <td>${esc(formatQty(i.current_stock, i.base_unit))}</td>
+                  <td>${esc(formatQty(i.min_stock, i.base_unit))}</td>
+                  <td><b>${esc(formatQty(i.suggested_buy, i.base_unit))}</b></td>
+                  <td style="text-align:center;">[ &nbsp; ]</td>
+                </tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>`
+      )
+      .join("");
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<!doctype html><html><head><title>Crown Coffee Bazar Shopping List</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 20px; color: #0f172a; }
+        h1 { margin: 0 0 4px; color: #1C274C; font-size: 20px; }
+        h3 { margin: 16px 0 6px; background: #1C274C; color: #fff; padding: 5px 10px; border-radius: 5px; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        th, td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; }
+        th { background: #f8fafc; }
+      </style></head><body>
+      <h1>Crown Coffee — Daily Bazar Shopping List</h1>
+      <div style="font-size:12px;color:#64748b;margin-bottom:12px;">Date: ${todayISO()} · Total Low Items: ${lowItems.length}</div>
+      ${sections}
+      <script>window.onload = () => window.print();</script>
+      </body></html>`);
+    win.document.close();
+  };
 
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
@@ -2281,6 +2447,7 @@ function InventoryOverviewView({ token, api, userRole }) {
               <th>Opening Stock</th>
               <th>Bazar</th>
               <th>Sale</th>
+              <th>Wastage</th>
               <th style={{ background: "#e0f2fe", color: "#0369a1" }}>Current Stock</th>
               <th>Min Stock</th>
               <th>Status</th>
@@ -2294,6 +2461,9 @@ function InventoryOverviewView({ token, api, userRole }) {
                 <td>{formatQty(i.central_total, i.base_unit)}</td>
                 <td>{formatQty(i.bazar_total, i.base_unit)}</td>
                 <td>{formatQty(i.sale_total, i.base_unit)}</td>
+                <td style={{ color: (i.wastage_total || 0) > 0 ? "var(--rose)" : "var(--ink-muted)", fontWeight: (i.wastage_total || 0) > 0 ? 700 : 400 }}>
+                  {formatQty(i.wastage_total || 0, i.base_unit)}
+                </td>
                 <td style={{ background: i.status === "LOW" ? "#ffe4e6" : "#f0f9ff" }}>
                   <span
                     style={{
@@ -2351,24 +2521,56 @@ function InventoryOverviewView({ token, api, userRole }) {
 
       <div className="split-equal">
         <div className="card">
-          <h4 style={{ marginTop: 0, color: "var(--red)" }}>Shopping List ({lowItems.length} Low)</h4>
+          <div className="row" style={{ marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+            <h4 style={{ margin: 0, color: "var(--red)" }}>Bazar Shopping List ({lowItems.length} Low)</h4>
+            {lowItems.length > 0 && (
+              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                <button
+                  className="primary"
+                  style={{ minHeight: "34px", padding: "0.25rem 0.8rem", fontSize: "0.8rem", background: copiedWa ? "#059669" : undefined }}
+                  onClick={copyWhatsAppShoppingList}
+                >
+                  {copiedWa ? "Copied for WhatsApp" : "Copy for WhatsApp"}
+                </button>
+                <button
+                  className="secondary"
+                  style={{ minHeight: "34px", padding: "0.25rem 0.75rem", fontSize: "0.8rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                  onClick={printShoppingList}
+                >
+                  <IconPrinter size={14} />
+                  <span>Print List</span>
+                </button>
+              </div>
+            )}
+          </div>
           {lowItems.length === 0 ? (
             <p style={{ color: "var(--gray)" }}>All items are above minimum stock.</p>
           ) : (
-            <div className="table-scroll">
-            <table className="data-table" style={{ width: "100%" }}>
-              <thead><tr><th>Item</th><th>Current</th><th>Min</th><th>Suggested Buy</th></tr></thead>
-              <tbody>
-                {lowItems.map((i) => (
-                  <tr key={i.id}>
-                    <td><b>{formatBazarName(i.name, i.base_unit || i.unit)}</b></td>
-                    <td>{formatQty(i.current_stock, i.base_unit)}</td>
-                    <td>{formatQty(i.min_stock, i.base_unit)}</td>
-                    <td style={{ color: "var(--blue-primary)", fontWeight: 700 }}>{formatQty(i.suggested_buy, i.base_unit)}</td>
-                  </tr>
+            <div style={{ display: "grid", gap: "0.85rem", maxHeight: "460px", overflowY: "auto" }}>
+              {Object.entries(groupedLowItems)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([dept, list]) => (
+                  <div key={dept}>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#1C274C", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.3rem", borderBottom: "1.5px solid #e2e8f0", paddingBottom: "3px" }}>
+                      {dept} ({list.length})
+                    </div>
+                    <div className="table-scroll">
+                      <table className="data-table" style={{ width: "100%", marginTop: 0 }}>
+                        <thead><tr><th>Item</th><th>Current</th><th>Min</th><th>Suggested Buy</th></tr></thead>
+                        <tbody>
+                          {list.map((i) => (
+                            <tr key={i.id}>
+                              <td><b>{formatBazarName(i.name, i.base_unit || i.unit)}</b></td>
+                              <td>{formatQty(i.current_stock, i.base_unit)}</td>
+                              <td>{formatQty(i.min_stock, i.base_unit)}</td>
+                              <td style={{ color: "var(--blue-primary)", fontWeight: 700 }}>{formatQty(i.suggested_buy, i.base_unit)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
             </div>
           )}
         </div>
@@ -2420,6 +2622,7 @@ function InventoryOverviewView({ token, api, userRole }) {
               <option value="central">Opening Stock</option>
               <option value="bazar">Bazar</option>
               <option value="sale">Sale</option>
+              <option value="wastage">Wastage / Staff</option>
               <option value="reversal">Reversal</option>
             </select>
           </div>
@@ -2457,10 +2660,283 @@ function InventoryOverviewView({ token, api, userRole }) {
   );
 }
 
+function WastageLogView({ token, api, userRole }) {
+  const isManager = userRole === "owner" || userRole === "manager";
+  const [items, setItems] = useState([]);
+  const [entries, setEntries] = useState([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [qtyLost, setQtyLost] = useState("");
+  const [reason, setReason] = useState("Expired milk");
+  const [customReason, setCustomReason] = useState("");
+  const [entryDate, setEntryDate] = useState(todayISO());
+  const [scanInput, setScanInput] = useState("");
+  const [showCam, setShowCam] = useState(false);
+  const [msg, setMsg] = useState({ text: "", type: "info" });
+  const [reverseId, setReverseId] = useState(null);
+
+  const QUICK_REASONS = [
+    "Expired milk",
+    "Espresso dial-in",
+    "Burnt / dropped",
+    "Staff meal",
+    "Bar staff drink",
+    "Spillage / damaged pack",
+  ];
+
+  const load = async () => {
+    try {
+      const [inv, led] = await Promise.all([
+        api("/inventory", token),
+        api("/inventory/ledger?type=wastage", token),
+      ]);
+      setItems(inv);
+      setEntries(led);
+      if (!selectedId && inv.length > 0) setSelectedId(String(inv[0].id));
+    } catch (e) {
+      setMsg({ text: e.message, type: "error" });
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [token]);
+
+  const handleScanCode = (raw) => {
+    const code = String(raw || "").trim().toUpperCase();
+    setScanInput("");
+    if (!code) return;
+    const matched = items.find((i) => i.barcode && i.barcode.toUpperCase() === code);
+    if (!matched) {
+      setMsg({ text: `No ingredient found for barcode: ${code}`, type: "error" });
+      return;
+    }
+    setSelectedId(String(matched.id));
+    setMsg({ text: `Selected: ${matched.name} (Stock: ${formatQty(matched.current_stock, matched.base_unit)})`, type: "info" });
+  };
+
+  const selectedItem = items.find((i) => String(i.id) === String(selectedId));
+  const estLossPaisa = selectedItem && qtyLost ? Math.round(parseFloat(qtyLost || "0") * (selectedItem.cost_per_unit || 0)) : 0;
+
+  const submit = async () => {
+    const qty = parseInt(qtyLost, 10);
+    if (!selectedId || !qty || qty <= 0) {
+      setMsg({ text: "Select an ingredient and enter a quantity greater than 0.", type: "error" });
+      return;
+    }
+    const finalReason = customReason.trim() ? `${reason}: ${customReason.trim()}` : reason;
+    try {
+      const res = await api("/inventory/wastage", token, {
+        ingredient_id: parseInt(selectedId, 10),
+        qty_lost: qty,
+        reason: finalReason,
+        date: entryDate,
+      });
+      setQtyLost("");
+      setCustomReason("");
+      setMsg({
+        text: `Logged wastage of ${formatQty(qty, selectedItem?.base_unit)} (${selectedItem?.name}) — Reason: ${finalReason}` + (res.cost_lost > 0 ? ` · Est. Loss: ৳${(res.cost_lost / 100).toFixed(2)}` : ""),
+        type: "info",
+      });
+      load();
+    } catch (e) {
+      setMsg({ text: e.message, type: "error" });
+    }
+  };
+
+  return (
+    <div style={{ display: "grid", gap: "1rem" }}>
+      <div className="card" style={{ border: "2px solid var(--rose-border)" }}>
+        <div className="row" style={{ marginBottom: "0.75rem", flexWrap: "wrap" }}>
+          <div>
+            <h3 style={{ margin: 0, color: "var(--rose)" }}>Wastage, Spoilage & Bar Dial-In Log</h3>
+            <p style={{ margin: "2px 0 0", fontSize: "0.84rem", color: "var(--ink-muted)" }}>
+              Deducts directly from Stock Ledger with reason so legitimate waste never looks like missing stock.
+            </p>
+          </div>
+          <input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
+        </div>
+
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.85rem" }}>
+          <input
+            placeholder="Scan ingredient barcode to select quickly..."
+            value={scanInput}
+            onChange={(e) => setScanInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleScanCode(scanInput)}
+            style={{ flex: "1 1 220px" }}
+          />
+          <button
+            className="secondary"
+            onClick={() => setShowCam(true)}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+          >
+            <IconCamera size={16} />
+            <span>Camera Scan</span>
+          </button>
+        </div>
+
+        {showCam && (
+          <CameraScannerModal
+            title="Scan Wasted Ingredient Barcode"
+            subtitle="Align ingredient barcode to auto-select for wastage entry"
+            continuous={false}
+            onScan={handleScanCode}
+            onClose={() => setShowCam(false)}
+          />
+        )}
+
+        <div className="split-equal" style={{ marginBottom: "0.85rem" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "4px" }}>
+              Ingredient / Bazar Item
+            </label>
+            <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} style={{ width: "100%" }}>
+              {items.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {formatBazarName(i.name, i.base_unit || i.unit)} — Stock: {formatQty(i.current_stock, i.base_unit)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "4px" }}>
+              Quantity Lost ({selectedItem?.base_unit || "g / ml / pcs"})
+            </label>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              <input
+                type="number"
+                min="1"
+                placeholder={`e.g. ${selectedItem?.base_unit === "pcs" ? "2" : "100"}`}
+                value={qtyLost}
+                onChange={(e) => setQtyLost(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              {estLossPaisa > 0 && (
+                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--rose)", whiteSpace: "nowrap" }}>
+                  Loss: ৳{(estLossPaisa / 100).toFixed(2)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: "0.85rem" }}>
+          <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "6px" }}>
+            Reason Category
+          </label>
+          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+            {QUICK_REASONS.map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={reason === r ? "primary" : "secondary"}
+                style={{ minHeight: "34px", padding: "0.25rem 0.8rem", fontSize: "0.82rem" }}
+                onClick={() => setReason(r)}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            placeholder="Optional note (e.g. Morning grinder calibration, dropped tray on T3)..."
+            value={customReason}
+            onChange={(e) => setCustomReason(e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </div>
+
+        {msg.text && (
+          <div
+            style={{
+              marginBottom: "0.85rem",
+              padding: "0.6rem 0.85rem",
+              borderRadius: "8px",
+              fontWeight: 600,
+              fontSize: "0.86rem",
+              background: msg.type === "error" ? "var(--rose-light)" : "var(--blue-light)",
+              color: msg.type === "error" ? "var(--rose)" : "var(--blue-primary)",
+            }}
+          >
+            {msg.text}
+          </div>
+        )}
+
+        <button className="danger-solid" style={{ minHeight: "44px", padding: "0 1.5rem", fontWeight: 700 }} onClick={submit}>
+          Record Wastage / Consumption
+        </button>
+      </div>
+
+      <div className="card">
+        <h4 style={{ marginTop: 0 }}>Recent Wastage & Staff Consumption ({entries.length})</h4>
+        {entries.length === 0 ? (
+          <p style={{ color: "var(--gray)" }}>No wastage entries recorded yet.</p>
+        ) : (
+          <div className="table-scroll">
+            <table className="data-table" style={{ width: "100%" }}>
+              <thead>
+                <tr><th>Date</th><th>Ingredient</th><th>Qty Deducted</th><th>Reason</th><th>Logged By</th><th>Action</th></tr>
+              </thead>
+              <tbody>
+                {entries.map((e) => (
+                  <tr key={e.id}>
+                    <td>{e.date}</td>
+                    <td><b>{formatBazarName(e.bazar_item_name, e.unit)}</b></td>
+                    <td style={{ color: "var(--rose)", fontWeight: 700 }}>{formatQty(e.quantity, e.unit)}</td>
+                    <td>{e.reason}</td>
+                    <td>{e.created_by}</td>
+                    <td>
+                      {isManager && (
+                        <button className="warn" style={{ minHeight: "30px", padding: "0.2rem 0.6rem", fontSize: "0.78rem" }} onClick={() => setReverseId(e.id)}>
+                          Reverse
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {reverseId && (
+        <OwnerPasswordModal
+          title="Reverse Wastage Entry"
+          description="Reversing a wastage ledger entry requires a reason and the Owner password."
+          requireReason={true}
+          onClose={() => setReverseId(null)}
+          onConfirm={async (pwd, revReason) => {
+            await api(`/inventory/ledger/${reverseId}/reverse`, token, { reason: revReason, owner_password: pwd });
+            setReverseId(null);
+            setMsg({ text: "Wastage entry reversed with Owner authorization.", type: "info" });
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 export function InventorySuite({ token, api, userRole, onBack }) {
-  const [tab, setTab] = useState("central");
+  const [tab, setTab] = useState("overview");
+  const [openingDone, setOpeningDone] = useState(false);
   const [bazarItems, setBazarItems] = useState([]);
   const [approvedMenu, setApprovedMenu] = useState([]);
+
+  const checkOpeningStatus = async (autoRoute = false) => {
+    try {
+      const centralBatches = await api("/batches?batch_type=central", token);
+      const hasApproved = centralBatches.some((b) => b.status === "approved");
+      setOpeningDone(hasApproved);
+      if (autoRoute && !hasApproved) {
+        setTab("central");
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    checkOpeningStatus(true);
+  }, [token]);
 
   const loadSheetsData = async () => {
     try {
@@ -2478,7 +2954,7 @@ export function InventorySuite({ token, api, userRole, onBack }) {
   }, [tab, token]);
 
   if (tab === "barcodes") {
-    return <PrintableBarcodeSheet items={bazarItems} menuItems={approvedMenu} onBack={() => setTab("central")} />;
+    return <PrintableBarcodeSheet items={bazarItems} menuItems={approvedMenu} onBack={() => setTab("overview")} />;
   }
 
   return (
@@ -2494,12 +2970,15 @@ export function InventorySuite({ token, api, userRole, onBack }) {
       </div>
 
       <div className="nav-tabs">
-        <button className={tab === "central" ? "active" : ""} onClick={() => setTab("central")}>Opening Stock</button>
+        <button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Inventory</button>
         <button className={tab === "bazar" ? "active" : ""} onClick={() => setTab("bazar")}>Daily Bazar</button>
         <button className={tab === "sale" ? "active" : ""} onClick={() => setTab("sale")}>Daily Sale</button>
+        <button className={tab === "wastage" ? "active" : ""} onClick={() => setTab("wastage")}>Wastage & Staff</button>
         <button className={tab === "recipes" ? "active" : ""} onClick={() => setTab("recipes")}>Recipes</button>
         <button className={tab === "menu" ? "active" : ""} onClick={() => setTab("menu")}>Menu</button>
-        <button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Inventory</button>
+        <button className={tab === "central" ? "active" : ""} onClick={() => setTab("central")}>
+          {openingDone ? "Opening Stock (Set)" : "Opening Stock (1-Time)"}
+        </button>
         <button className={tab === "barcodes" ? "active" : ""} onClick={() => setTab("barcodes")} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
           <IconPrinter size={15} />
           <span>Barcode Sheets</span>
@@ -2507,8 +2986,9 @@ export function InventorySuite({ token, api, userRole, onBack }) {
       </div>
 
       {(tab === "central" || tab === "bazar" || tab === "sale") && (
-        <BatchScannerView batchType={tab} token={token} api={api} userRole={userRole} />
+        <BatchScannerView batchType={tab} token={token} api={api} userRole={userRole} onChanged={() => checkOpeningStatus(false)} />
       )}
+      {tab === "wastage" && <WastageLogView token={token} api={api} userRole={userRole} />}
       {tab === "recipes" && <RecipesView token={token} api={api} userRole={userRole} />}
       {tab === "menu" && <MenuApprovedView token={token} api={api} userRole={userRole} />}
       {tab === "overview" && <InventoryOverviewView token={token} api={api} userRole={userRole} />}

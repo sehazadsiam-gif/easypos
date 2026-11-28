@@ -32,14 +32,15 @@ export function BarcodeSvg({ value, width = 1.8, height = 48, showText = true })
   );
 }
 
-// 6 Core Pantry Departments for Bazar Ingredients
+// Core Pantry & Bar Departments for Bazar Ingredients
 const INGREDIENT_CATEGORIES = {
+  "Bar Syrups & Coffee": ["coffee", "syrup", "sprite", "frappe", "kitkat", "oreo", "nutella", "ice cube", "whipping cream", "powder milk", "water", "chocolate"],
   "Proteins & Poultry": ["beef", "chicken", "prawn", "fish", "bacon", "egg", "wings", "strips", "thigh", "fillet", "meat", "tori"],
   "Dairy & Cold Storage": ["butter", "milk", "cheese", "cream", "yogurt", "ice cream", "mozzarella", "parmesan"],
   "Bakery & Starches": ["flour", "bread", "ciabatta", "bagel", "croissant", "rice", "pasta", "noodle", "breadcrumbs", "tortilla", "bun", "cornflour", "spaghetti", "fettuccine", "penne", "wrapper", "batter"],
-  "Produce & Vegetables": ["lettuce", "tomato", "onion", "garlic", "ginger", "carrot", "cabbage", "capsicum", "cucumber", "lemon", "lime", "spring onion", "mushroom", "coriander", "herb", "parsley", "chilli", "potato", "avocado", "sprout", "cauliflower", "basil", "mint", "pickle", "rosemary", "grape", "spinach", "bean", "vegetable"],
-  "Sauces, Pastes & Oils": ["sauce", "oil", "mayo", "mayonnaise", "paste", "ketchup", "mustard", "honey", "vinegar", "syrup", "dressing", "extract"],
-  "Spices, Seasonings & Dry": ["salt", "pepper", "sugar", "paprika", "baking powder", "sesame", "ajinomoto", "powder", "cashew", "flakes", "cornstarch", "coffee", "cocoa", "nori", "oregano", "peanut", "chocolate"]
+  "Produce & Vegetables": ["lettuce", "tomato", "onion", "garlic", "ginger", "carrot", "cabbage", "capsicum", "cucumber", "lemon", "lime", "spring onion", "mushroom", "coriander", "herb", "parsley", "chilli", "potato", "avocado", "sprout", "cauliflower", "basil", "mint", "pickle", "rosemary", "grape", "spinach", "bean", "vegetable", "orange", "pineapple", "papaya", "mango"],
+  "Sauces, Pastes & Oils": ["sauce", "oil", "mayo", "mayonnaise", "paste", "ketchup", "mustard", "honey", "vinegar", "dressing", "extract"],
+  "Spices, Seasonings & Dry": ["salt", "pepper", "sugar", "paprika", "baking powder", "sesame", "ajinomoto", "powder", "cashew", "flakes", "cornstarch", "cocoa", "nori", "oregano", "peanut"]
 };
 
 export const classifyIngredient = (name = "") => {

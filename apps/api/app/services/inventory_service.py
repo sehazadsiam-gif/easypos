@@ -75,6 +75,18 @@ def get_approved_recipe(db, tenant_id: int, item_id: int) -> Optional[Recipe]:
     )
 
 
+def compute_recipe_cost(db, tenant_id: int, recipe_id: int) -> int:
+    """Compute exact recipe ingredient cost (COGS) in integer paisa."""
+    from app.models import RecipeItem
+    lines = db.query(RecipeItem).filter_by(tenant_id=tenant_id, recipe_id=recipe_id).all()
+    total = 0
+    for ri in lines:
+        ing = db.get(Ingredient, ri.ingredient_id)
+        if ing and ing.tenant_id == tenant_id:
+            total += int(ri.qty or 0) * int(ing.cost_per_unit or 0)
+    return int(total)
+
+
 def get_inventory_summary(
     db,
     tenant_id: int,
@@ -110,6 +122,8 @@ def get_inventory_summary(
         bazar_total = tmap.get("bazar", 0)
         sale_raw = tmap.get("sale", 0)  # negative in ledger
         sale_total = -sale_raw if sale_raw < 0 else sale_raw
+        wastage_raw = tmap.get("wastage", 0)  # negative in ledger
+        wastage_total = -wastage_raw if wastage_raw < 0 else wastage_raw
         reversal_total = tmap.get("reversal", 0)
         current_stock = current_map.get(ing.id, 0)
         min_stock = ing.min_stock or 0
@@ -128,6 +142,7 @@ def get_inventory_summary(
             "central_total": central_total,
             "bazar_total": bazar_total,
             "sale_total": sale_total,
+            "wastage_total": wastage_total,
             "reversal_total": reversal_total,
             "current_stock": current_stock,
             "status": "LOW" if is_low else "OK",
