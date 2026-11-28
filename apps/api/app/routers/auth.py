@@ -13,19 +13,34 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/login")
 def login(b: LoginIn, request: Request, db=Depends(get_db)):
     client_ip = request.client.host if request.client else "unknown"
-    rate_key = f"login:{client_ip}:{b.tenant}:{b.emp_id}"
+    tenant_code = (b.tenant or "crown").strip() or "crown"
+    emp_id = (b.emp_id or "").strip()
+    rate_key = f"login:{client_ip}:{tenant_code}:{emp_id or 'pin'}"
     
-    if not check_rate_limit(rate_key, max_attempts=5, window_seconds=60):
+    if not check_rate_limit(rate_key, max_attempts=10, window_seconds=60):
         raise HTTPException(429, "Too many failed login attempts. Please wait 1 minute.")
 
-    t = db.query(Tenant).filter_by(code=b.tenant).first()
+    t = db.query(Tenant).filter_by(code=tenant_code).first()
     if not t or not t.active:
         record_failed_attempt(rate_key)
         raise HTTPException(401, "Invalid business code or account disabled")
-    u = db.query(User).filter_by(tenant_id=t.id, emp_id=b.emp_id).first()
-    if not u or not vp(b.password, u.pw):
+
+    u = None
+    if emp_id:
+        cand = db.query(User).filter_by(tenant_id=t.id, emp_id=emp_id).first()
+        if cand and vp(b.password, cand.pw):
+            u = cand
+    else:
+        # Password/PIN-only login: match against tenant staff accounts automatically
+        candidates = db.query(User).filter_by(tenant_id=t.id).order_by(User.id.asc()).all()
+        for cand in candidates:
+            if vp(b.password, cand.pw):
+                u = cand
+                break
+
+    if not u:
         record_failed_attempt(rate_key)
-        raise HTTPException(401, "Wrong employee ID or password")
+        raise HTTPException(401, "Invalid security PIN or password")
     
     clear_rate_limit(rate_key)
     branch = db.query(Branch).filter_by(tenant_id=t.id, id=u.branch_id).first() if u.branch_id else None

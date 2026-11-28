@@ -2,8 +2,8 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
 class LoginIn(BaseModel):
-    tenant: str
-    emp_id: str
+    tenant: str = "crown"
+    emp_id: Optional[str] = None
     password: str
 
 class ItemIn(BaseModel):

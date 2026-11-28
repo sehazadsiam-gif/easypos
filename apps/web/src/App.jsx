@@ -61,15 +61,15 @@ const CHANNELS = [
 ];
 
 function Login({ onLogin, onInstall, canInstall }) {
-  const [f, setF] = useState({ tenant: "", emp_id: "", password: "" });
+  const [f, setF] = useState({ tenant: "", password: "" });
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   const go = async () => {
-    if (!f.emp_id.trim() || !f.password) {
-      setErr("Please enter your employee ID and security PIN/password.");
+    if (!f.password) {
+      setErr("Please enter your security PIN or password.");
       return;
     }
     setLoading(true);
@@ -77,7 +77,6 @@ function Login({ onLogin, onInstall, canInstall }) {
     try {
       const payload = {
         tenant: f.tenant.trim() || "crown",
-        emp_id: f.emp_id.trim(),
         password: f.password
       };
       const res = await api("/auth/login", null, payload);
@@ -129,26 +128,6 @@ function Login({ onLogin, onInstall, canInstall }) {
 
         <div className="auth-form-field">
           <label className="auth-form-label">
-            <span>Staff Employee ID</span>
-            <span style={{ color: "#94a3b8", fontWeight: 500 }}>ID Number</span>
-          </label>
-          <div className="auth-input-wrapper">
-            <span className="auth-input-icon">
-              <IconUser size={16} color="#94a3b8" />
-            </span>
-            <input
-              className="auth-input"
-              placeholder="Enter Employee ID"
-              value={f.emp_id}
-              onChange={set("emp_id")}
-              autoFocus
-              autoComplete="username"
-            />
-          </div>
-        </div>
-
-        <div className="auth-form-field">
-          <label className="auth-form-label">
             <span>Security PIN / Password</span>
             <span style={{ color: "#94a3b8", fontWeight: 500 }}>Required</span>
           </label>
@@ -163,6 +142,7 @@ function Login({ onLogin, onInstall, canInstall }) {
               value={f.password}
               onChange={set("password")}
               onKeyDown={(e) => e.key === "Enter" && go()}
+              autoFocus
               autoComplete="current-password"
             />
           </div>

@@ -195,3 +195,20 @@ def test_manager_role_restricted_to_inventory():
     # Manager is blocked from viewing financial reports
     r_rep = client.get("/reports/daily", headers=mgr_headers)
     assert r_rep.status_code == 403
+
+
+def test_password_only_login_routes_by_role():
+    r_owner = client.post("/auth/login", json={"tenant": "crown", "password": "258000"})
+    assert r_owner.status_code == 200
+    assert r_owner.json()["role"] == "owner"
+
+    r_mgr = client.post("/auth/login", json={"tenant": "crown", "password": "456456"})
+    assert r_mgr.status_code == 200
+    assert r_mgr.json()["role"] == "manager"
+
+    r_cash = client.post("/auth/login", json={"tenant": "crown", "password": "admin123"})
+    assert r_cash.status_code == 200
+    assert r_cash.json()["role"] == "cashier"
+
+    r_bad = client.post("/auth/login", json={"tenant": "crown", "password": "wrong-pin-999"})
+    assert r_bad.status_code == 401
