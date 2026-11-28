@@ -147,6 +147,7 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
   const [editApprovedMode, setEditApprovedMode] = useState(false);
   const [showOwnerAuth, setShowOwnerAuth] = useState(false);
   const [showClearAuth, setShowClearAuth] = useState(false);
+  const [showDeleteBatchAuth, setShowDeleteBatchAuth] = useState(false);
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const scanRef = useRef(null);
 
@@ -521,6 +522,33 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
                 />
               )}
               <button className="secondary" onClick={startNewDraft}>+ New Draft</button>
+              {activeBatch && (
+                <button
+                  className="warn"
+                  style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                  onClick={async () => {
+                    if (activeBatch.status === "draft") {
+                      if (!window.confirm(`Delete Draft Batch #${activeBatch.id}?`)) return;
+                      try {
+                        await api(`/batches/${activeBatch.id}/delete`, token, {});
+                        setActiveBatch(null);
+                        setLines([]);
+                        setMsg({ text: `Draft Batch #${activeBatch.id} deleted.`, type: "info" });
+                        loadData();
+                        onChanged?.();
+                      } catch (e) {
+                        setMsg({ text: e.message, type: "error" });
+                      }
+                    } else {
+                      setShowDeleteBatchAuth(true);
+                    }
+                  }}
+                  title="Delete this batch"
+                >
+                  <IconClose size={13} />
+                  <span>Delete Batch #{activeBatch.id}</span>
+                </button>
+              )}
               <button
                 className="warn"
                 style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
@@ -840,6 +868,25 @@ function BatchScannerView({ batchType, token, api, userRole, onChanged }) {
               description={`Enter the Owner password to save edits to approved ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} Batch #${activeBatch?.id}. Stock ledger entries will be reconciled automatically.`}
               onClose={() => setShowOwnerAuth(false)}
               onConfirm={saveApprovedChanges}
+            />
+          )}
+
+          {showDeleteBatchAuth && activeBatch && (
+            <OwnerPasswordModal
+              title={`Delete Approved Batch #${activeBatch.id}`}
+              description={`This will permanently delete approved ${batchType === "central" ? "Monthly Opening Stock" : batchType === "bazar" ? "Daily Bazar" : "Daily Sale"} Batch #${activeBatch.id} and recalculate stock balances. Owner password required.`}
+              onClose={() => setShowDeleteBatchAuth(false)}
+              onConfirm={async (ownerPassword) => {
+                await api(`/batches/${activeBatch.id}/delete`, token, { owner_password: ownerPassword });
+                const deletedId = activeBatch.id;
+                setShowDeleteBatchAuth(false);
+                setActiveBatch(null);
+                setLines([]);
+                setEditApprovedMode(false);
+                setMsg({ text: `Approved Batch #${deletedId} deleted with Owner authorization.`, type: "info" });
+                loadData();
+                onChanged?.();
+              }}
             />
           )}
 
@@ -1469,11 +1516,15 @@ function MenuApprovedView({ token, api, userRole }) {
   const [items, setItems] = useState([]);
   const [selectedBarcode, setSelectedBarcode] = useState(null);
   const [editingItemId, setEditingItemId] = useState(null);
+  const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editStation, setEditStation] = useState("kitchen");
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
-  const [pendingPriceSave, setPendingPriceSave] = useState(null); // { item_id, name, pricePaisa }
+  const [pendingMenuSave, setPendingMenuSave] = useState(null);
+  const [pendingMenuDelete, setPendingMenuDelete] = useState(null);
 
   const loadItems = () => {
     api("/items", token).then(setItems).catch(() => {});
@@ -1486,43 +1537,63 @@ function MenuApprovedView({ token, api, userRole }) {
   const handleStartEdit = (m, e) => {
     e.stopPropagation();
     setEditingItemId(m.id);
+    setEditName(m.name || "");
     setEditPrice(m.price ? (m.price / 100).toString() : "");
+    setEditCategory(m.category || "General");
+    setEditStation(m.station || "kitchen");
   };
 
-  const commitPriceUpdate = async (item_id, pricePaisa, ownerPassword = null) => {
+  const commitMenuUpdate = async (payload, ownerPassword = null) => {
     setSaving(true);
     try {
       await api(
-        `/items/${item_id}`,
+        `/items/${payload.item_id}`,
         token,
-        { price: pricePaisa, ...(ownerPassword ? { owner_password: ownerPassword } : {}) },
+        {
+          name: payload.name,
+          price: payload.pricePaisa,
+          category: payload.category,
+          station: payload.station,
+          ...(ownerPassword ? { owner_password: ownerPassword } : {}),
+        },
         "PATCH"
       );
       setEditingItemId(null);
-      setPendingPriceSave(null);
+      setPendingMenuSave(null);
       loadItems();
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSavePrice = async (item_id, e) => {
+  const handleSaveMenu = async (item_id, e) => {
     e.stopPropagation();
-    const parsed = parseFloat(editPrice);
+    if (!editName.trim()) {
+      alert("Item name cannot be empty");
+      return;
+    }
+    const parsed = editPrice === "" ? 0 : parseFloat(editPrice);
     if (isNaN(parsed) || parsed < 0) {
       alert("Please enter a valid selling price in Taka (e.g. 399)");
       return;
     }
     const pricePaisa = parsed > 0 ? Math.round(parsed * 100) : 0;
+    const payload = {
+      item_id,
+      name: editName.trim(),
+      pricePaisa,
+      category: editCategory.trim() || "General",
+      station: editStation,
+    };
     const targetItem = items.find((i) => i.id === item_id);
     if (targetItem && targetItem.recipe_status === "approved") {
-      setPendingPriceSave({ item_id, name: targetItem.name, pricePaisa });
+      setPendingMenuSave(payload);
       return;
     }
     try {
-      await commitPriceUpdate(item_id, pricePaisa);
+      await commitMenuUpdate(payload);
     } catch (err) {
-      alert("Failed to update price: " + (err.message || err));
+      alert("Failed to update menu item: " + (err.message || err));
     }
   };
 
@@ -1624,47 +1695,90 @@ function MenuApprovedView({ token, api, userRole }) {
 
               <div style={{ marginTop: "0.8rem", borderTop: "1px solid #f1f5f9", paddingTop: "0.6rem" }}>
                 {isEditing ? (
-                  <div onClick={(e) => e.stopPropagation()} style={{ background: "#f8fafc", padding: "8px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                    <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--ink)", display: "block", marginBottom: "4px" }}>
-                      Enter Selling Price in Taka (৳):
-                    </label>
-                    <div className="row" style={{ gap: "4px" }}>
+                  <div onClick={(e) => e.stopPropagation()} style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", border: "1px solid #e2e8f0", display: "grid", gap: "0.45rem" }}>
+                    <div>
+                      <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--ink-muted)", display: "block", marginBottom: "2px" }}>Name</label>
                       <input
-                        type="number"
-                        step="1"
-                        placeholder="e.g. 399"
-                        value={editPrice}
-                        onChange={(e) => setEditPrice(e.target.value)}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleSavePrice(m.id, e);
-                          if (e.key === "Escape") setEditingItemId(null);
-                        }}
-                        style={{ flex: 1, padding: "6px 8px", fontSize: "0.95rem", fontWeight: 700 }}
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "0.88rem", fontWeight: 600 }}
                       />
-                      <button className="primary" style={{ padding: "6px 12px", fontSize: "0.82rem" }} disabled={saving} onClick={(e) => handleSavePrice(m.id, e)}>
-                        {saving ? "..." : "Save"}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem" }}>
+                      <div>
+                        <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--ink-muted)", display: "block", marginBottom: "2px" }}>Price (৳)</label>
+                        <input
+                          type="number"
+                          step="1"
+                          placeholder="e.g. 399"
+                          value={editPrice}
+                          onChange={(e) => setEditPrice(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveMenu(m.id, e);
+                            if (e.key === "Escape") setEditingItemId(null);
+                          }}
+                          style={{ width: "100%", padding: "6px 8px", fontSize: "0.9rem", fontWeight: 700 }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--ink-muted)", display: "block", marginBottom: "2px" }}>Station</label>
+                        <select
+                          value={editStation}
+                          onChange={(e) => setEditStation(e.target.value)}
+                          style={{ width: "100%", padding: "6px 8px", fontSize: "0.85rem" }}
+                        >
+                          <option value="kitchen">Kitchen</option>
+                          <option value="bar">Bar</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--ink-muted)", display: "block", marginBottom: "2px" }}>Category</label>
+                      <input
+                        type="text"
+                        value={editCategory}
+                        onChange={(e) => setEditCategory(e.target.value)}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "0.85rem" }}
+                      />
+                    </div>
+                    <div className="row" style={{ gap: "0.4rem", marginTop: "0.2rem" }}>
+                      <button className="primary" style={{ flex: 1, padding: "6px 10px", fontSize: "0.82rem", minHeight: "34px" }} disabled={saving} onClick={(e) => handleSaveMenu(m.id, e)}>
+                        {saving ? "..." : "Save Changes"}
                       </button>
-                      <button style={{ padding: "6px 8px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }} onClick={(e) => { e.stopPropagation(); setEditingItemId(null); }}>
+                      <button style={{ padding: "6px 10px", fontSize: "0.82rem", minHeight: "34px" }} onClick={(e) => { e.stopPropagation(); setEditingItemId(null); }}>
                         <IconClose size={13} />
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "0.4rem" }}>
                     <div>
                       <span style={{ fontSize: "0.75rem", color: "var(--gray)", display: "block" }}>Selling Price:</span>
                       <b style={{ color: hasPrice ? "var(--blue-primary)" : "#d97706", fontSize: "1.05rem" }}>
                         {hasPrice ? tk(m.price) : "Not Set (—)"}
                       </b>
                     </div>
-                    <button
-                      className={hasPrice ? "" : "primary"}
-                      style={{ fontSize: "0.8rem", padding: "5px 12px", borderRadius: "6px" }}
-                      onClick={(e) => handleStartEdit(m, e)}
-                    >
-                      {hasPrice ? "Edit Price" : "Set Price"}
-                    </button>
+                    <div style={{ display: "flex", gap: "0.35rem" }}>
+                      <button
+                        className={hasPrice ? "" : "primary"}
+                        style={{ fontSize: "0.78rem", padding: "5px 10px", minHeight: "34px", borderRadius: "6px" }}
+                        onClick={(e) => handleStartEdit(m, e)}
+                      >
+                        {hasPrice ? "Edit" : "Set Price"}
+                      </button>
+                      <button
+                        className="warn"
+                        style={{ fontSize: "0.78rem", padding: "5px 8px", minHeight: "34px", borderRadius: "6px" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingMenuDelete(m);
+                        }}
+                        title="Delete menu item (Owner Password required)"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1673,12 +1787,25 @@ function MenuApprovedView({ token, api, userRole }) {
         })}
       </div>
 
-      {pendingPriceSave && (
+      {pendingMenuSave && (
         <OwnerPasswordModal
-          title="Authorize Approved Menu Edit"
-          description={`"${pendingPriceSave.name}" is an approved menu item. Enter the Owner password to update its selling price.`}
-          onClose={() => setPendingPriceSave(null)}
-          onConfirm={(pwd) => commitPriceUpdate(pendingPriceSave.item_id, pendingPriceSave.pricePaisa, pwd)}
+          title="Authorize Menu Item Edit"
+          description={`Enter the Owner password to update "${pendingMenuSave.name}".`}
+          onClose={() => setPendingMenuSave(null)}
+          onConfirm={(pwd) => commitMenuUpdate(pendingMenuSave, pwd)}
+        />
+      )}
+
+      {pendingMenuDelete && (
+        <OwnerPasswordModal
+          title="Delete Menu Item"
+          description={`Permanently delete "${pendingMenuDelete.name}" and its recipes? Historical paid orders remain intact. Owner password required.`}
+          onClose={() => setPendingMenuDelete(null)}
+          onConfirm={async (pwd) => {
+            await api(`/items/${pendingMenuDelete.id}/delete`, token, { owner_password: pwd });
+            setPendingMenuDelete(null);
+            loadItems();
+          }}
         />
       )}
     </div>
@@ -1698,6 +1825,9 @@ function InventoryOverviewView({ token, api, userRole }) {
   const [msg, setMsg] = useState("");
   const [reverseTargetId, setReverseTargetId] = useState(null);
   const [clearScope, setClearScope] = useState(null); // "central" | "bazar" | "sale" | "all" | null
+  const [editIng, setEditIng] = useState(null); // { id, name, unit, pack_size, min_stock, cost_tk }
+  const [pendingIngSave, setPendingIngSave] = useState(null);
+  const [pendingIngDelete, setPendingIngDelete] = useState(null);
 
   const load = async () => {
     try {
@@ -1807,6 +1937,132 @@ function InventoryOverviewView({ token, api, userRole }) {
         />
       )}
 
+      {editIng && (
+        <div className="modal-backdrop" onClick={() => setEditIng(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "460px" }}>
+            <div className="row" style={{ marginBottom: "0.85rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, color: "var(--ink)" }}>
+                Edit Ingredient / Bazar Item
+              </h3>
+              <button onClick={() => setEditIng(null)} style={{ minHeight: "32px", padding: "0 8px" }}>
+                <IconClose size={14} />
+              </button>
+            </div>
+            <div style={{ display: "grid", gap: "0.7rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "3px" }}>Ingredient Name *</label>
+                <input
+                  type="text"
+                  value={editIng.name}
+                  onChange={(e) => setEditIng({ ...editIng, name: e.target.value })}
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "3px" }}>Unit Cost (৳ per base unit)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editIng.cost_tk}
+                    onChange={(e) => setEditIng({ ...editIng, cost_tk: e.target.value })}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "3px" }}>Base Unit</label>
+                  <select
+                    value={editIng.unit}
+                    onChange={(e) => setEditIng({ ...editIng, unit: e.target.value })}
+                    style={{ width: "100%" }}
+                  >
+                    <option value="g">g (grams)</option>
+                    <option value="ml">ml (milliliters)</option>
+                    <option value="pcs">pcs (pieces)</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "3px" }}>Pack Size</label>
+                  <input
+                    type="number"
+                    value={editIng.pack_size}
+                    onChange={(e) => setEditIng({ ...editIng, pack_size: e.target.value })}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "3px" }}>Min Stock</label>
+                  <input
+                    type="number"
+                    value={editIng.min_stock}
+                    onChange={(e) => setEditIng({ ...editIng, min_stock: e.target.value })}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "0.6rem", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+                <button onClick={() => setEditIng(null)}>Cancel</button>
+                <button
+                  className="primary"
+                  onClick={() => {
+                    if (!editIng.name.trim()) return alert("Ingredient name is required");
+                    setPendingIngSave(editIng);
+                  }}
+                >
+                  Save (Owner Password)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingIngSave && (
+        <OwnerPasswordModal
+          title="Authorize Ingredient Edit"
+          description={`Enter the Owner password to save changes to "${pendingIngSave.name}".`}
+          onClose={() => setPendingIngSave(null)}
+          onConfirm={async (pwd) => {
+            const pSize = parseFloat(pendingIngSave.pack_size || "100");
+            const pUnit = pendingIngSave.unit === "g" ? `${pSize}gm` : pendingIngSave.unit === "ml" ? `${pSize}ml` : `${pSize} pcs`;
+            await api(
+              `/inventory/${pendingIngSave.id}`,
+              token,
+              {
+                name: pendingIngSave.name.trim(),
+                unit: pendingIngSave.unit,
+                pack_size: pSize,
+                pack_unit: pUnit,
+                min_stock: parseInt(pendingIngSave.min_stock || "0", 10),
+                cost_per_unit: Math.round(parseFloat(pendingIngSave.cost_tk || "0") * 100),
+                owner_password: pwd,
+              },
+              "PATCH"
+            );
+            setPendingIngSave(null);
+            setEditIng(null);
+            setMsg(`Updated ingredient "${pendingIngSave.name.trim()}" with Owner authorization.`);
+            load();
+          }}
+        />
+      )}
+
+      {pendingIngDelete && (
+        <OwnerPasswordModal
+          title="Delete Ingredient / Bazar Item"
+          description={`Permanently delete "${pendingIngDelete.name}" from inventory, recipes, and stock history? Owner password required.`}
+          onClose={() => setPendingIngDelete(null)}
+          onConfirm={async (pwd) => {
+            await api(`/inventory/${pendingIngDelete.id}/delete`, token, { owner_password: pwd });
+            setPendingIngDelete(null);
+            setMsg(`Deleted ingredient "${pendingIngDelete.name}" with Owner authorization.`);
+            load();
+          }}
+        />
+      )}
+
       <div className="card" style={{ borderColor: "var(--rose-border)", background: "#fffafb" }}>
         <div className="row" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
@@ -1861,6 +2117,7 @@ function InventoryOverviewView({ token, api, userRole }) {
               <th>Current Stock</th>
               <th>Min Stock</th>
               <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1876,6 +2133,32 @@ function InventoryOverviewView({ token, api, userRole }) {
                   <span style={{ fontWeight: 700, color: i.status === "LOW" ? "var(--red)" : "var(--green)" }}>
                     {i.status}
                   </span>
+                </td>
+                <td>
+                  <div style={{ display: "flex", gap: "0.35rem" }}>
+                    <button
+                      style={{ minHeight: "30px", padding: "0.2rem 0.6rem", fontSize: "0.78rem" }}
+                      onClick={() =>
+                        setEditIng({
+                          id: i.id,
+                          name: i.name,
+                          unit: i.base_unit || i.unit || "g",
+                          pack_size: String(i.pack_size || 100),
+                          min_stock: String(i.min_stock || 0),
+                          cost_tk: ((i.cost_per_unit || 0) / 100).toFixed(2),
+                        })
+                      }
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="warn"
+                      style={{ minHeight: "30px", padding: "0.2rem 0.6rem", fontSize: "0.78rem" }}
+                      onClick={() => setPendingIngDelete(i)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -1,8 +1,8 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.dependencies import get_db, auth, apply_postgres_rls, verify_owner_password
-from app.models import Item, Recipe, RecipeItem
-from app.schemas import ItemIn, ItemUpdateIn
+from app.models import Item, Recipe, RecipeItem, InventoryBatchLine
+from app.schemas import ItemIn, ItemUpdateIn, OwnerActionIn
 from app.services.inventory_service import validate_barcode, get_approved_recipe
 
 router = APIRouter(prefix="/items", tags=["items"])
@@ -134,3 +134,21 @@ def update_item(item_id: int, b: ItemUpdateIn, u=Depends(auth), db=Depends(get_d
         "price": it.price,
         "station": it.station,
     }
+
+
+@router.post("/{item_id}/delete")
+def delete_item(item_id: int, b: OwnerActionIn, u=Depends(auth), db=Depends(get_db)):
+    """Delete a menu item and its recipes (historical paid order lines stay snapshotted). Requires Owner Password."""
+    apply_postgres_rls(db, u["tid"])
+    verify_owner_password(db, u["tid"], b.owner_password)
+
+    it = db.query(Item).filter_by(tenant_id=u["tid"], id=item_id).first()
+    if not it:
+        raise HTTPException(404, "Item not found")
+
+    db.query(RecipeItem).filter_by(tenant_id=u["tid"], item_id=it.id).delete(synchronize_session=False)
+    db.query(Recipe).filter_by(tenant_id=u["tid"], item_id=it.id).delete(synchronize_session=False)
+    db.query(InventoryBatchLine).filter_by(tenant_id=u["tid"], menu_item_id=it.id).delete(synchronize_session=False)
+    db.delete(it)
+    db.commit()
+    return {"status": "deleted", "id": item_id}

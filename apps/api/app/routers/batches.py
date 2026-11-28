@@ -12,7 +12,7 @@ from app.models import (
     StockLedger,
     User,
 )
-from app.schemas import BatchCreateIn, BatchLinesUpdateIn, BatchApproveIn
+from app.schemas import BatchCreateIn, BatchLinesUpdateIn, BatchApproveIn, OwnerActionIn
 from app.services.inventory_service import today_str, get_current_stock_map, get_approved_recipe
 
 router = APIRouter(prefix="/batches", tags=["batches"])
@@ -398,5 +398,30 @@ def delete_batch(batch_id: int, u=Depends(auth), db=Depends(get_db)):
 
     db.query(InventoryBatchLine).filter_by(tenant_id=u["tid"], batch_id=batch.id).delete()
     db.delete(batch)
+    db.commit()
+    return {"status": "deleted", "id": batch_id}
+
+
+@router.post("/{batch_id}/delete")
+def delete_batch_with_owner_auth(batch_id: int, b: OwnerActionIn, u=Depends(auth), db=Depends(get_db)):
+    """Delete a draft or approved batch (Opening Stock, Daily Bazar, or Daily Sale). Approved batches strictly require Owner Password."""
+    apply_postgres_rls(db, u["tid"])
+    batch = db.get(InventoryBatch, batch_id)
+    if not batch or batch.tenant_id != u["tid"]:
+        raise HTTPException(404, "Batch not found")
+
+    if batch.status != "draft":
+        verify_owner_password(db, u["tid"], b.owner_password)
+
+    tid = u["tid"]
+    db.query(InventoryBatchLine).filter_by(tenant_id=tid, batch_id=batch.id).delete(synchronize_session=False)
+    db.query(StockLedger).filter_by(tenant_id=tid, batch_id=batch.id).delete(synchronize_session=False)
+    db.delete(batch)
+    db.flush()
+
+    stock_map = get_current_stock_map(db, tid)
+    for ing in db.query(Ingredient).filter_by(tenant_id=tid).all():
+        ing.current_stock = stock_map.get(ing.id, 0)
+
     db.commit()
     return {"status": "deleted", "id": batch_id}

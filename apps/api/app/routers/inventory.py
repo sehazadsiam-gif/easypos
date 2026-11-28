@@ -5,7 +5,10 @@ from app.models import (
     Ingredient, RecipeItem, Item, DailyBazar, StockMovement,
     BazarTrip, StockLedger, User, InventoryBatch, InventoryBatchLine
 )
-from app.schemas import IngredientIn, RecipeSetIn, DailyBazarIn, WastageIn, BazarTripIn, LedgerReversalIn, InventoryClearIn
+from app.schemas import (
+    IngredientIn, IngredientUpdateIn, RecipeSetIn, DailyBazarIn,
+    WastageIn, BazarTripIn, LedgerReversalIn, InventoryClearIn, OwnerActionIn
+)
 from app.services.inventory_service import get_inventory_summary, get_current_stock_map, validate_barcode, today_str
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -419,3 +422,75 @@ def clear_inventory_scope(b: InventoryClearIn, u=Depends(auth), db=Depends(get_d
         "batches_deleted": batches_deleted,
         "ledger_entries_deleted": ledger_deleted,
     }
+
+
+@router.patch("/{ingredient_id}")
+def update_ingredient(ingredient_id: int, b: IngredientUpdateIn, u=Depends(auth), db=Depends(get_db)):
+    """Edit ingredient / bazar item name, price (cost_per_unit), unit, min_stock, or barcode. Requires Owner Password."""
+    apply_postgres_rls(db, u["tid"])
+    verify_owner_password(db, u["tid"], b.owner_password)
+
+    ing = db.query(Ingredient).filter_by(tenant_id=u["tid"], id=ingredient_id).first()
+    if not ing:
+        raise HTTPException(404, "Ingredient not found")
+
+    if b.name is not None and b.name.strip():
+        ing.name = b.name.strip()
+    if b.unit is not None:
+        if b.unit not in ("g", "ml", "pcs"):
+            raise HTTPException(400, "Base unit must be g, ml, or pcs")
+        ing.unit = b.unit
+    if b.barcode is not None and b.barcode.strip():
+        clean_bc = validate_barcode(b.barcode)
+        if clean_bc != ing.barcode:
+            exists = db.query(Ingredient).filter_by(tenant_id=u["tid"], barcode=clean_bc).first()
+            if exists:
+                raise HTTPException(400, f"Barcode '{clean_bc}' already in use")
+            ing.barcode = clean_bc
+    if b.pack_size is not None and b.pack_size > 0:
+        ing.pack_size = b.pack_size
+    if b.pack_unit is not None:
+        ing.pack_unit = b.pack_unit
+    if b.min_stock is not None:
+        if b.min_stock < 0:
+            raise HTTPException(400, "Minimum stock cannot be negative")
+        ing.min_stock = b.min_stock
+    if b.cost_per_unit is not None:
+        if b.cost_per_unit < 0:
+            raise HTTPException(400, "Cost per unit cannot be negative")
+        ing.cost_per_unit = b.cost_per_unit
+
+    db.commit()
+    db.refresh(ing)
+    return {
+        "id": ing.id,
+        "name": ing.name,
+        "barcode": ing.barcode,
+        "unit": ing.unit,
+        "pack_size": ing.pack_size,
+        "pack_unit": ing.pack_unit,
+        "min_stock": ing.min_stock,
+        "cost_per_unit": ing.cost_per_unit,
+        "current_stock": ing.current_stock,
+    }
+
+
+@router.post("/{ingredient_id}/delete")
+def delete_ingredient(ingredient_id: int, b: OwnerActionIn, u=Depends(auth), db=Depends(get_db)):
+    """Delete an ingredient / bazar item and its references. Strictly requires Owner Password."""
+    apply_postgres_rls(db, u["tid"])
+    verify_owner_password(db, u["tid"], b.owner_password)
+
+    ing = db.query(Ingredient).filter_by(tenant_id=u["tid"], id=ingredient_id).first()
+    if not ing:
+        raise HTTPException(404, "Ingredient not found")
+
+    tid = u["tid"]
+    db.query(RecipeItem).filter_by(tenant_id=tid, ingredient_id=ing.id).delete(synchronize_session=False)
+    db.query(InventoryBatchLine).filter_by(tenant_id=tid, bazar_item_id=ing.id).delete(synchronize_session=False)
+    db.query(StockLedger).filter_by(tenant_id=tid, bazar_item_id=ing.id).delete(synchronize_session=False)
+    db.query(DailyBazar).filter_by(tenant_id=tid, ingredient_id=ing.id).delete(synchronize_session=False)
+    db.query(StockMovement).filter_by(tenant_id=tid, ingredient_id=ing.id).delete(synchronize_session=False)
+    db.delete(ing)
+    db.commit()
+    return {"status": "deleted", "id": ingredient_id}

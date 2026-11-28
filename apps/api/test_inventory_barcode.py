@@ -307,3 +307,40 @@ def test_clear_inventory_requires_owner_password():
     item2 = next(x for x in inv2 if x["id"] == ing_id)
     assert item2["central_total"] == 0
     assert item2["current_stock"] == 0
+
+
+def test_owner_edit_and_delete_menu_ingredient_and_batch():
+    owner_h = get_headers("owner")
+    mgr_h = get_headers("manager")
+
+    # 1. Create ingredient and test edit/delete with owner password
+    bc_i = f"ING-ED-{uuid.uuid4().hex[:5].upper()}"
+    ing_id = client.post("/inventory", json={"name": "Old Ing", "unit": "g", "barcode": bc_i, "pack_size": 100, "min_stock": 100}, headers=owner_h).json()["id"]
+
+    assert client.patch(f"/inventory/{ing_id}", json={"name": "New Ing", "cost_per_unit": 500}, headers=mgr_h).status_code == 403
+    r_upd_ing = client.patch(f"/inventory/{ing_id}", json={"name": "New Ing", "cost_per_unit": 500, "owner_password": "258000"}, headers=owner_h)
+    assert r_upd_ing.status_code == 200
+    assert r_upd_ing.json()["name"] == "New Ing"
+    assert r_upd_ing.json()["cost_per_unit"] == 500
+
+    # 2. Create approved bazar batch and delete it with owner password
+    bb = client.post("/batches", json={"batch_type": "bazar"}, headers=owner_h).json()["id"]
+    client.put(f"/batches/{bb}/lines", json={"lines": [{"bazar_item_id": ing_id, "quantity": 200, "pack_count": 2}]}, headers=owner_h)
+    client.post(f"/batches/{bb}/approve", json={}, headers=owner_h)
+    assert client.post(f"/batches/{bb}/delete", json={}, headers=owner_h).status_code == 403
+    assert client.post(f"/batches/{bb}/delete", json={"owner_password": "258000"}, headers=owner_h).status_code == 200
+
+    # 3. Create menu item, edit name/price, and delete with owner password
+    bc_m = f"MENU-ED-{uuid.uuid4().hex[:5].upper()}"
+    menu_id = client.post("/items", json={"name": "Old Drink", "barcode": bc_m, "station": "bar"}, headers=owner_h).json()["id"]
+    r_upd_m = client.patch(f"/items/{menu_id}", json={"name": "New Drink", "price": 25000, "owner_password": "258000"}, headers=owner_h)
+    assert r_upd_m.status_code == 200
+    assert r_upd_m.json()["name"] == "New Drink"
+    assert r_upd_m.json()["price"] == 25000
+
+    assert client.post(f"/items/{menu_id}/delete", json={"owner_password": "wrong"}, headers=owner_h).status_code == 403
+    assert client.post(f"/items/{menu_id}/delete", json={"owner_password": "258000"}, headers=owner_h).status_code == 200
+
+    # 4. Delete ingredient with owner password
+    assert client.post(f"/inventory/{ing_id}/delete", json={}, headers=owner_h).status_code == 403
+    assert client.post(f"/inventory/{ing_id}/delete", json={"owner_password": "258000"}, headers=owner_h).status_code == 200

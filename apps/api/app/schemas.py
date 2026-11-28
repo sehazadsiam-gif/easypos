@@ -198,3 +198,18 @@ class InventoryClearIn(BaseModel):
     scope: str  # "central", "bazar", "sale", "all"
     owner_password: Optional[str] = None
     reason: Optional[str] = None
+
+
+class OwnerActionIn(BaseModel):
+    owner_password: Optional[str] = None
+
+
+class IngredientUpdateIn(BaseModel):
+    name: Optional[str] = None
+    unit: Optional[str] = None
+    barcode: Optional[str] = None
+    pack_size: Optional[float] = None
+    pack_unit: Optional[str] = None
+    min_stock: Optional[int] = None
+    cost_per_unit: Optional[int] = None
+    owner_password: Optional[str] = None
